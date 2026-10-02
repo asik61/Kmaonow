@@ -168,10 +168,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               href={task.partner_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+              className="mt-3 inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-sm font-black transition-all shadow-[0_4px_14px_rgba(5,150,105,0.35)] active:scale-98 cursor-pointer"
             >
-              <span>{task.title} Partner App Kholein</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <span>🚀 Offer Start Karein (Open {task.title})</span>
+              <ExternalLink className="w-4 h-4" />
             </a>
           </div>
 

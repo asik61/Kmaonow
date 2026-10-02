@@ -67,6 +67,12 @@ import { EarningsCardImage } from './components/EarningsCardImage';
 import { AuthScreen } from './components/AuthScreen';
 import { SplashScreen } from './components/SplashScreen';
 import { testConnection, syncUserWallet, logoutFromFirebase } from './services/firebase';
+import { NotificationModal } from './components/NotificationModal';
+import {
+  type InAppNotification,
+  INITIAL_NOTIFICATIONS,
+  sendOutPushNotification,
+} from './services/notifications';
 
 type NavTab = 'home' | 'tasks' | 'spin' | 'scratch' | 'profile' | 'offers' | 'refer' | 'daily' | 'withdraw';
 
@@ -131,6 +137,13 @@ export default function App() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+
+  // Notifications State
+  const [notifications, setNotifications] = useState<InAppNotification[]>(() => {
+    const saved = localStorage.getItem('realmoney_notifications');
+    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
+  });
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -172,6 +185,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('kamaonow_spins', String(freeSpinsLeft));
   }, [freeSpinsLeft]);
+
+  useEffect(() => {
+    localStorage.setItem('realmoney_notifications', JSON.stringify(notifications));
+  }, [notifications]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -284,6 +301,18 @@ export default function App() {
     bankAccount?: string;
     bankIfsc?: string;
   }) => {
+    const isFirstWithdrawal = wallet.lifetime_withdrawn === 0 && withdrawals.length === 0;
+    const minRequired = isFirstWithdrawal ? 20 : 100;
+
+    if (payload.amount < minRequired) {
+      return {
+        ok: false,
+        error: isFirstWithdrawal
+          ? 'Pehli baar minimum withdrawal limit sirf ₹20.00 hai.'
+          : 'Minimum withdrawal limit ₹100.00 hai.',
+      };
+    }
+
     if (payload.amount > wallet.available_balance) {
       return { ok: false, error: 'Insufficient balance' };
     }
@@ -319,6 +348,23 @@ export default function App() {
       created_at: new Date().toISOString(),
     };
     setLedger([newEntry, ...ledger]);
+
+    // In-App Notification
+    const newNotif: InAppNotification = {
+      id: `notif-${Date.now()}`,
+      title: `⚡ ₹${payload.amount.toFixed(2)} Payout Pending`,
+      message: `Aapka ₹${payload.amount.toFixed(2)} ka withdrawal request submit ho gaya hai. UPI ID: ${payload.upiId || payload.bankAccount}`,
+      type: 'withdrawal',
+      timestamp: new Date().toISOString(),
+      read: false,
+      actionTab: 'withdraw',
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+
+    // Out-of-App Push Notification
+    sendOutPushNotification('Real Money App 💸', {
+      body: `₹${payload.amount.toFixed(2)} ka withdrawal request receive ho gaya hai!`,
+    }).catch(console.warn);
 
     return { ok: true };
   };
@@ -403,6 +449,21 @@ export default function App() {
       pending_balance: Math.max(0, Number((prev.pending_balance - wdr.amount).toFixed(2))),
       lifetime_withdrawn: Number((prev.lifetime_withdrawn + wdr.amount).toFixed(2)),
     }));
+
+    const approvedNotif: InAppNotification = {
+      id: `notif-${Date.now()}`,
+      title: `✅ ₹${wdr.amount.toFixed(2)} Paid to UPI!`,
+      message: `Bank UTR: ${utr}. Aapka withdrawal successfully transfer ho gaya hai.`,
+      type: 'withdrawal',
+      timestamp: new Date().toISOString(),
+      read: false,
+      actionTab: 'withdraw',
+    };
+    setNotifications((prev) => [approvedNotif, ...prev]);
+
+    sendOutPushNotification('Real Money App 💰 Paid!', {
+      body: `Badhai Ho! ₹${wdr.amount.toFixed(2)} aapke UPI me credit ho gaya hai. (UTR: ${utr})`,
+    }).catch(console.warn);
 
     showToast(`Withdrawal marked Paid! Bank UTR: ${utr}`);
   };
@@ -510,7 +571,7 @@ export default function App() {
     setFreeSpinsLeft(1);
     setDailyBonusClaimed(false);
     setIsLoggedIn(false);
-    showToast('Reset to original KamaoNow demo state.');
+    showToast('Reset to original Real Money App state.');
   };
 
   const handleLoginSuccess = (loggedInUser: UserProfile, isNewUser: boolean) => {
@@ -629,12 +690,16 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setShowLedgerModal(true)}
+            onClick={() => setShowNotificationModal(true)}
             className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer backdrop-blur-xs relative"
-            title="Notifications & History"
+            title="Notifications"
           >
             <Bell className="w-3.5 h-3.5 text-white" />
-            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-yellow-400 border border-emerald-800 animate-pulse" />
+            {notifications.filter((n) => !n.read).length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-amber-400 text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center px-0.5 shadow-sm animate-pulse">
+                {notifications.filter((n) => !n.read).length}
+              </span>
+            )}
           </button>
         </div>
       </header>
@@ -681,13 +746,23 @@ export default function App() {
             </div>
 
             {/* 3. WITHDRAW NOW BUTTON (Slimmer & Mobile Friendly) */}
-            <button
-              type="button"
-              onClick={() => setShowWithdrawModal(true)}
-              className="w-full py-2.5 rounded-full bg-gradient-to-r from-[#00A86B] via-[#00874E] to-[#006837] hover:from-[#00B875] hover:to-[#007A43] text-white font-bold text-sm tracking-wide shadow-[0_4px_14px_rgba(0,135,78,0.28)] transition-all active:scale-[0.98] cursor-pointer text-center"
-            >
-              Withdraw Now
-            </button>
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => setShowWithdrawModal(true)}
+                className="w-full py-2.5 rounded-full bg-gradient-to-r from-[#00A86B] via-[#00874E] to-[#006837] hover:from-[#00B875] hover:to-[#007A43] text-white font-bold text-sm tracking-wide shadow-[0_4px_14px_rgba(0,135,78,0.28)] transition-all active:scale-[0.98] cursor-pointer text-center"
+              >
+                Withdraw Now
+              </button>
+              <div className="text-[10px] text-center font-bold text-emerald-800 flex items-center justify-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>
+                  {wallet.lifetime_withdrawn === 0 && withdrawals.length === 0
+                    ? '1st Withdrawal: Min sirf ₹20 • Instant UPI Payout'
+                    : 'Minimum Withdrawal: ₹100 • Instant UPI Payout'}
+                </span>
+              </div>
+            </div>
 
             {/* 4. PROMO CAROUSEL BANNER (Invite Friends, Spin & Win, Scratch & Win) */}
             <HomeBannerSlider onNavigate={(tab) => setActiveTab(tab)} />
@@ -1409,8 +1484,28 @@ export default function App() {
         <WithdrawModal
           availableBalance={wallet.available_balance}
           userPhone={user.phone}
+          isFirstWithdrawal={wallet.lifetime_withdrawn === 0 && withdrawals.length === 0}
           onClose={() => setShowWithdrawModal(false)}
           onRequestWithdrawal={handleRequestWithdrawal}
+        />
+      )}
+
+      {/* NOTIFICATIONS MODAL (In-App & Push Notification Center) */}
+      {showNotificationModal && (
+        <NotificationModal
+          notifications={notifications}
+          onClose={() => setShowNotificationModal(false)}
+          onMarkAsRead={(id) => {
+            setNotifications((prev) =>
+              prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+            );
+          }}
+          onMarkAllAsRead={() => {
+            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+            showToast('Sabhi notifications mark as read ho gayi.');
+          }}
+          onNavigateTab={(tab) => setActiveTab(tab as NavTab)}
+          showToast={showToast}
         />
       )}
 

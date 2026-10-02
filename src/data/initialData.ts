@@ -26,10 +26,10 @@ export const INITIAL_USER: UserProfile = {
 
 export const INITIAL_ADMIN: UserProfile = {
   id: 'usr-admin-01',
-  name: 'KamaoNow Admin (Ops Desk)',
+  name: 'Real Money App Admin (Ops Desk)',
   phone: '9999888877',
-  email: 'admin@kamaonow.com',
-  referral_code: 'ADMINHQ',
+  email: 'admin@realmoneyapp.online',
+  referral_code: 'REALHQ',
   referred_by: null,
   is_blocked: false,
   is_verified: true,

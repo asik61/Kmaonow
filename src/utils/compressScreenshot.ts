@@ -76,11 +76,11 @@ export function generateSyntheticProofReceipt(taskTitle: string, rewardAmount: n
 
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 24px sans-serif';
-  ctx.fillText('KamaoNow Partner Verification', 36, 55);
+  ctx.fillText('Real Money App Partner Verification', 36, 55);
 
   ctx.fillStyle = '#D1FAE5';
   ctx.font = '14px monospace';
-  ctx.fillText(`TASK-ID: KN-${Date.now().toString().slice(-8)}`, 36, 85);
+  ctx.fillText(`TASK-ID: RM-${Date.now().toString().slice(-8)}`, 36, 85);
 
   // White Card container
   ctx.fillStyle = '#FFFFFF';

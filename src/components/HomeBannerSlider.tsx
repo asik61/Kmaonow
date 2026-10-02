@@ -146,8 +146,8 @@ export const HomeBannerSlider: React.FC<HomeBannerSliderProps> = ({ onNavigate }
                 {/* App Header Bar */}
                 <rect x="-70" y="-118" width="140" height="42" fill="#047857" />
                 <circle cx="-45" cy="-97" r="10" fill="#34D399" />
-                <text x="-45" y="-93" textAnchor="middle" fill="#064E3B" fontSize="12" fontWeight="900">K</text>
-                <text x="5" y="-93" fill="#FFFFFF" fontSize="14" fontWeight="800">KamaoNow</text>
+                <text x="-45" y="-93" textAnchor="middle" fill="#064E3B" fontSize="10" fontWeight="900">RM</text>
+                <text x="5" y="-93" fill="#FFFFFF" fontSize="13" fontWeight="800">RealMoney</text>
 
                 {/* Screen Center Balance */}
                 <text x="0" y="-30" textAnchor="middle" fill="#A7F3D0" fontSize="12" fontWeight="700">Wallet Balance</text>

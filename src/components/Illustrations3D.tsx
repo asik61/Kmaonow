@@ -1,53 +1,78 @@
 import React from 'react';
 
-export const KamaoNowLogo3D: React.FC<{ size?: number }> = ({ size = 40 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 100 100"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)] select-none shrink-0"
-  >
-    <defs>
-      <linearGradient id="kLogoBg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#10B981" />
-        <stop offset="50%" stopColor="#059669" />
-        <stop offset="100%" stopColor="#047857" />
-      </linearGradient>
-      <filter id="kShadow" x="-20%" y="-20%" width="140%" height="140%">
-        <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.25" />
-      </filter>
-    </defs>
+export const RealMoneyLogo3D: React.FC<{ size?: number | string }> = ({ size = 40 }) => {
+  const numSize = typeof size === 'number' ? size : size === 'lg' ? 64 : 40;
+  return (
+    <svg
+      width={numSize}
+      height={numSize}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="drop-shadow-[0_6px_16px_rgba(0,0,0,0.35)] select-none shrink-0"
+    >
+      <defs>
+        <linearGradient id="rmLogoBg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#10B981" />
+          <stop offset="50%" stopColor="#059669" />
+          <stop offset="100%" stopColor="#047857" />
+        </linearGradient>
+        <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FDE68A" />
+          <stop offset="50%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#D97706" />
+        </linearGradient>
+        <filter id="rmShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.3" />
+        </filter>
+      </defs>
 
-    {/* Green Rounded Squircle matching image */}
-    <rect width="100" height="100" rx="26" fill="url(#kLogoBg)" />
-    {/* Inner subtle bevel border */}
-    <rect x="2" y="2" width="96" height="96" rx="24" stroke="#6EE7B7" strokeWidth="2.5" opacity="0.5" />
+      {/* Emerald Rounded Squircle */}
+      <rect width="100" height="100" rx="26" fill="url(#rmLogoBg)" />
+      {/* Inner subtle bevel border */}
+      <rect x="2" y="2" width="96" height="96" rx="24" stroke="#6EE7B7" strokeWidth="2.5" opacity="0.6" />
 
-    {/* White Stylized 'K' with Upward Diagonal Arrow matching image */}
-    {/* Vertical Stem */}
-    <path
-      d="M24 22 C24 20 25.5 18 28 18 L38 18 C40.5 18 42 20 42 22 L42 78 C42 80 40.5 82 38 82 L28 82 C25.5 82 24 80 24 78 Z"
-      fill="#FFFFFF"
-      filter="url(#kShadow)"
-    />
+      {/* Golden Rupee Symbol & Growth Arrow */}
+      {/* Upper Horizontal Bar */}
+      <path
+        d="M26 25 L74 25 C76 25 78 27 78 29 C78 31 76 33 74 33 L26 33 C24 33 22 31 22 29 C22 27 24 25 26 25 Z"
+        fill="url(#goldGradient)"
+        filter="url(#rmShadow)"
+      />
+      {/* Middle Horizontal Bar */}
+      <path
+        d="M26 39 L60 39 C62 39 64 41 64 43 C64 45 62 47 60 47 L26 47 C24 47 22 45 22 43 C22 41 24 39 26 39 Z"
+        fill="url(#goldGradient)"
+        filter="url(#rmShadow)"
+      />
+      {/* Vertical Spine */}
+      <path
+        d="M38 25 L38 52 C45 52 56 50 56 42 C56 35 48 34 40 34"
+        stroke="url(#goldGradient)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        fill="none"
+        filter="url(#rmShadow)"
+      />
+      {/* Diagonal Slanted Leg */}
+      <path
+        d="M37 50 L64 77 C66 79 69 79 71 77 C73 75 73 72 71 70 L48 47"
+        stroke="url(#goldGradient)"
+        strokeWidth="7"
+        strokeLinecap="round"
+        fill="none"
+        filter="url(#rmShadow)"
+      />
 
-    {/* Lower Diagonal Leg of K */}
-    <path
-      d="M38 52 L62 80 C64 82 67 83 70 81 L77 75 C79 73 79 70 77 67 L52 42 Z"
-      fill="#FFFFFF"
-      filter="url(#kShadow)"
-    />
+      {/* Upward Growth Arrow Indicator */}
+      <circle cx="76" cy="30" r="14" fill="#10B981" stroke="#FFFFFF" strokeWidth="2.5" />
+      <path d="M72 34 L80 26 M80 26 L74 26 M80 26 L80 32" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+};
 
-    {/* Upper Diagonal Arrow of K pointing to top-right */}
-    <path
-      d="M44 48 L62 28 L56 28 C53 28 51 26 51 24 C51 22 53 20 56 20 L76 20 C78.5 20 80 21.5 80 24 L80 44 C80 47 78 49 76 49 C74 49 72 47 72 44 L72 38 L54 58 Z"
-      fill="#FFFFFF"
-      filter="url(#kShadow)"
-    />
-  </svg>
-);
+// Backward-compatible alias
+export const KamaoNowLogo3D = RealMoneyLogo3D;
 
 export const EarningsCharacter3D: React.FC<{ className?: string }> = ({ className = 'w-24 h-24' }) => (
   <svg
@@ -58,135 +83,99 @@ export const EarningsCharacter3D: React.FC<{ className?: string }> = ({ classNam
   >
     {/* Floating Coin 1 */}
     <g className="animate-pulse">
-      <circle cx="28" cy="38" r="14" fill="#EAB308" stroke="#FEF08A" strokeWidth="2" />
-      <circle cx="28" cy="38" r="10" fill="#FACC15" />
-      <text x="28" y="43" textAnchor="middle" fill="#713F12" fontSize="13" fontWeight="900" fontFamily="sans-serif">₹</text>
+      <ellipse cx="40" cy="45" rx="16" ry="10" fill="#F59E0B" />
+      <ellipse cx="40" cy="43" rx="14" ry="8" fill="#FDE68A" />
+      <text x="40" y="47" textAnchor="middle" fill="#B45309" fontSize="10" fontWeight="bold">₹</text>
     </g>
 
     {/* Floating Coin 2 */}
-    <circle cx="135" cy="48" r="11" fill="#EAB308" stroke="#FEF08A" strokeWidth="2" />
-    <circle cx="135" cy="48" r="8" fill="#FACC15" />
-    <text x="135" y="52" textAnchor="middle" fill="#713F12" fontSize="10" fontWeight="900" fontFamily="sans-serif">₹</text>
+    <g className="animate-pulse" style={{ animationDelay: '300ms' }}>
+      <ellipse cx="120" cy="50" rx="14" ry="9" fill="#F59E0B" />
+      <ellipse cx="120" cy="48" rx="12" ry="7" fill="#FDE68A" />
+      <text x="120" y="52" textAnchor="middle" fill="#B45309" fontSize="9" fontWeight="bold">₹</text>
+    </g>
 
-    {/* Character Head & Hair */}
-    <circle cx="80" cy="65" r="32" fill="#FBCFE8" /> {/* Face skin */}
-    {/* Hair (Black 3D stylish hair) */}
+    {/* Money Bag Main Body */}
     <path
-      d="M52 56 C52 36 70 30 84 30 C100 30 114 38 114 56 C114 45 106 38 92 38 C76 38 60 48 52 56 Z"
-      fill="#1E293B"
-    />
-    <path
-      d="M54 50 C58 38 72 32 88 32 C104 32 110 40 112 50 C108 42 98 38 86 38 C72 38 60 44 54 50 Z"
-      fill="#0F172A"
+      d="M80 40 C65 40 60 52 50 68 C40 85 45 125 60 135 C70 142 90 142 100 135 C115 125 120 85 110 68 C100 52 95 40 80 40 Z"
+      fill="url(#moneyBagGrad)"
+      filter="url(#charShadow)"
     />
 
-    {/* Big Happy Eyes with sparkle */}
-    <circle cx="70" cy="62" r="5" fill="#0F172A" />
-    <circle cx="72" cy="60" r="1.5" fill="#FFFFFF" />
-    <circle cx="90" cy="62" r="5" fill="#0F172A" />
-    <circle cx="92" cy="60" r="1.5" fill="#FFFFFF" />
+    {/* Bag Tie Ribbon */}
+    <path d="M68 62 C75 60 85 60 92 62" stroke="#B45309" strokeWidth="5" strokeLinecap="round" />
+    <circle cx="80" cy="62" r="5" fill="#F59E0B" />
 
-    {/* Cheerful Smile */}
-    <path
-      d="M72 74 Q80 84 88 74"
-      stroke="#BE185D"
-      strokeWidth="3.5"
-      strokeLinecap="round"
-      fill="#FFFFFF"
-    />
-    {/* Rosy Cheeks */}
-    <ellipse cx="64" cy="71" rx="4" ry="2.5" fill="#F472B6" opacity="0.6" />
-    <ellipse cx="96" cy="71" rx="4" ry="2.5" fill="#F472B6" opacity="0.6" />
-
-    {/* Green Hoodie Body */}
-    <path
-      d="M48 110 C48 92 62 88 80 88 C98 88 112 92 112 110 L118 150 L42 150 Z"
-      fill="#059669"
-      stroke="#047857"
-      strokeWidth="2"
-    />
-    {/* Hoodie Collar / Zipper */}
-    <path d="M80 88 L80 130" stroke="#10B981" strokeWidth="3" strokeLinecap="round" />
-    <path d="M72 90 L80 102 L88 90" stroke="#34D399" strokeWidth="2.5" fill="none" />
-
-    {/* Smartphone in hands */}
-    <rect x="68" y="105" width="24" height="42" rx="4" fill="#0F172A" stroke="#38BDF8" strokeWidth="2" />
-    <rect x="71" y="109" width="18" height="30" rx="2" fill="#10B981" />
-    <text x="80" y="128" textAnchor="middle" fill="#FFFFFF" fontSize="11" fontWeight="bold">₹</text>
-
-    {/* Hands holding phone */}
-    <ellipse cx="66" cy="120" rx="5" ry="6" fill="#FBCFE8" />
-    <ellipse cx="94" cy="120" rx="5" ry="6" fill="#FBCFE8" />
+    {/* Large Rupee Emblem on Bag */}
+    <circle cx="80" cy="100" r="20" fill="#FEF3C7" stroke="#F59E0B" strokeWidth="3" />
+    <text x="80" y="108" textAnchor="middle" fill="#92400E" fontSize="22" fontWeight="900" fontFamily="sans-serif">
+      ₹
+    </text>
 
     {/* Sparkles */}
-    <path d="M120 22 L122 14 L124 22 L132 24 L124 26 L122 34 L120 26 L112 24 Z" fill="#FDE047" />
+    <path d="M125 85 L128 78 L135 75 L128 72 L125 65 L122 72 L115 75 L122 78 Z" fill="#FDE68A" />
+    <path d="M35 95 L37 90 L42 88 L37 86 L35 81 L33 86 L28 88 L33 90 Z" fill="#FDE68A" />
+
+    <defs>
+      <linearGradient id="moneyBagGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#10B981" />
+        <stop offset="40%" stopColor="#059669" />
+        <stop offset="100%" stopColor="#064E3B" />
+      </linearGradient>
+      <filter id="charShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#000000" floodOpacity="0.4" />
+      </filter>
+    </defs>
   </svg>
 );
 
-export const ReferCharacter3D: React.FC<{ className?: string }> = ({ className = 'w-20 h-20' }) => (
+export const ReferCharacter3D: React.FC<{ className?: string }> = ({ className = 'w-24 h-24' }) => (
   <svg
-    viewBox="0 0 160 140"
+    viewBox="0 0 160 160"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    className={`drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)] select-none ${className}`}
+    className={`drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] select-none ${className}`}
   >
-    {/* Friend 1 (Green Hoodie) */}
-    <circle cx="55" cy="50" r="22" fill="#FBCFE8" />
-    <path d="M35 44 C35 30 48 24 60 24 C72 24 78 32 78 44 Z" fill="#1E293B" />
-    <circle cx="49" cy="48" r="3.5" fill="#0F172A" />
-    <circle cx="63" cy="48" r="3.5" fill="#0F172A" />
-    <path d="M51 57 Q56 64 61 57" stroke="#BE185D" strokeWidth="2.5" strokeLinecap="round" />
-    <path d="M30 84 C30 70 42 66 56 66 C70 66 80 70 80 84 L84 130 L26 130 Z" fill="#059669" />
+    {/* Left Friend Avatar */}
+    <circle cx="55" cy="65" r="22" fill="#6EE7B7" stroke="#047857" strokeWidth="3" />
+    <path d="M45 62 Q55 72 65 62" stroke="#047857" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+    <circle cx="48" cy="55" r="2.5" fill="#047857" />
+    <circle cx="62" cy="55" r="2.5" fill="#047857" />
+    <path d="M30 115 C30 95 42 90 55 90 C68 90 80 95 80 115" fill="#059669" />
 
-    {/* Friend 2 (Yellow Hoodie) */}
-    <circle cx="105" cy="50" r="22" fill="#FED7AA" />
-    <path d="M85 44 C85 30 98 24 110 24 C122 24 128 32 128 44 Z" fill="#78350F" />
-    <circle cx="99" cy="48" r="3.5" fill="#0F172A" />
-    <circle cx="113" cy="48" r="3.5" fill="#0F172A" />
-    <path d="M101 57 Q106 64 111 57" stroke="#BE185D" strokeWidth="2.5" strokeLinecap="round" />
-    <path d="M80 84 C80 70 92 66 106 66 C120 66 130 70 130 84 L134 130 L76 130 Z" fill="#D97706" />
+    {/* Right Friend Avatar */}
+    <circle cx="105" cy="65" r="22" fill="#FCD34D" stroke="#D97706" strokeWidth="3" />
+    <path d="M95 62 Q105 72 115 62" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+    <circle cx="98" cy="55" r="2.5" fill="#D97706" />
+    <circle cx="112" cy="55" r="2.5" fill="#D97706" />
+    <path d="M80 115 C80 95 92 90 105 90 C118 90 130 95 130 115" fill="#D97706" />
 
-    {/* WhatsApp / Chat Bubble between them */}
-    <ellipse cx="80" cy="24" rx="18" ry="14" fill="#22C55E" />
-    <path d="M72 34 L70 42 L78 37 Z" fill="#22C55E" />
-    <text x="80" y="28" textAnchor="middle" fill="#FFFFFF" fontSize="12" fontWeight="bold">₹3</text>
-
-    {/* Floating Coin */}
-    <circle cx="20" cy="30" r="10" fill="#EAB308" stroke="#FEF08A" strokeWidth="2" />
-    <text x="20" y="34" textAnchor="middle" fill="#713F12" fontSize="9" fontWeight="bold">₹</text>
+    {/* Center Floating Gift/Coin */}
+    <g className="animate-bounce">
+      <circle cx="80" cy="40" r="14" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2" />
+      <text x="80" y="45" textAnchor="middle" fill="#FFFFFF" fontSize="14" fontWeight="bold">₹</text>
+    </g>
   </svg>
 );
 
 export const GiftBox3D: React.FC<{ className?: string }> = ({ className = 'w-16 h-16' }) => (
   <svg
-    viewBox="0 0 120 120"
+    viewBox="0 0 100 100"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
-    className={`drop-shadow-[0_10px_20px_rgba(234,179,8,0.4)] select-none ${className}`}
+    className={`drop-shadow-[0_8px_16px_rgba(0,0,0,0.4)] select-none ${className}`}
   >
-    {/* Base box */}
-    <rect x="25" y="45" width="70" height="60" rx="8" fill="#DC2626" stroke="#991B1B" strokeWidth="2" />
-    {/* Gold Ribbon Vertical */}
-    <rect x="52" y="45" width="16" height="60" fill="#FACC15" />
-    {/* Gold Ribbon Horizontal */}
-    <rect x="25" y="68" width="70" height="14" fill="#FACC15" />
+    {/* Box Body */}
+    <rect x="20" y="42" width="60" height="46" rx="8" fill="#EF4444" />
+    <rect x="44" y="42" width="12" height="46" fill="#FCD34D" />
 
-    {/* Box Lid (Angle tilted open with coins spilling out) */}
-    <path d="M18 42 L102 36 L100 48 L16 54 Z" fill="#EF4444" stroke="#B91C1C" strokeWidth="2" />
-    <rect x="52" y="36" width="16" height="16" fill="#FDE047" transform="rotate(-4 60 44)" />
+    {/* Box Lid */}
+    <rect x="15" y="32" width="70" height="14" rx="4" fill="#DC2626" />
+    <rect x="44" y="32" width="12" height="14" fill="#FBBF24" />
 
-    {/* 3D Bow Ribbon */}
-    <path d="M46 36 C34 22 52 14 58 32 C62 14 80 22 70 36 Z" fill="#FBBF24" stroke="#D97706" strokeWidth="2" />
-
-    {/* Gold Coins popping out */}
-    <circle cx="40" cy="25" r="9" fill="#EAB308" stroke="#FEF08A" strokeWidth="1.5" />
-    <text x="40" y="28" textAnchor="middle" fill="#713F12" fontSize="9" fontWeight="bold">₹</text>
-
-    <circle cx="78" cy="20" r="11" fill="#EAB308" stroke="#FEF08A" strokeWidth="2" />
-    <text x="78" y="24" textAnchor="middle" fill="#713F12" fontSize="11" fontWeight="bold">₹</text>
-
-    {/* Sparkles */}
-    <path d="M96 15 L98 8 L100 15 L107 17 L100 19 L98 26 L96 19 L89 17 Z" fill="#FDE047" />
-    <path d="M22 65 L23 60 L24 65 L29 66 L24 67 L23 72 L22 67 L17 66 Z" fill="#FDE047" />
+    {/* Ribbon Bow */}
+    <path d="M38 24 C34 16 46 16 48 24 Z" fill="#FBBF24" stroke="#D97706" strokeWidth="1.5" />
+    <path d="M62 24 C66 16 54 16 52 24 Z" fill="#FBBF24" stroke="#D97706" strokeWidth="1.5" />
+    <circle cx="50" cy="25" r="3.5" fill="#F59E0B" />
   </svg>
 );

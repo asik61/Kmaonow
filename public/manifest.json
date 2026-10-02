@@ -1,14 +1,15 @@
 {
-  "id": "/",
-  "name": "Real Money App — Daily Cash, Spin, Scratch & Earn",
-  "short_name": "RealMoney",
-  "description": "Bharat Ka #1 Real Cash Platform! Complete tasks, spin wheel, scratch cards, and withdraw cash directly to UPI.",
+  "id": "https://realmoneyapp.online/",
+  "name": "Real Money App: Daily Cash, Spin & Instant UPI",
+  "short_name": "Real Money App",
+  "description": "Complete tasks, spin wheel, scratch cards, and withdraw real cash directly to your UPI. 100% free with zero investment.",
   "theme_color": "#047857",
-  "background_color": "#031C14",
+  "background_color": "#032219",
   "display": "standalone",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "scope": "/",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
+  "categories": ["finance", "lifestyle", "games"],
   "icons": [
     {
       "src": "/pwa-192x192.png",
@@ -27,6 +28,29 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Daily Spin & Win",
+      "short_name": "Spin",
+      "description": "Spin the lucky wheel for instant cash",
+      "url": "/?tab=spin",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Withdraw Cash",
+      "short_name": "Withdraw",
+      "description": "Instant UPI Cash Withdrawal",
+      "url": "/?tab=withdraw",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Refer & Earn",
+      "short_name": "Refer",
+      "description": "Invite friends and earn extra cash",
+      "url": "/?tab=refer",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     }
   ]
 }

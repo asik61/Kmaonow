@@ -95,8 +95,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-emerald-500/20 bg-[#021A13]">
           <div>
-            <div className="text-xs text-emerald-400 font-mono">PWA Manual Admin (TaskPay Style)</div>
-            <h1 className="text-lg sm:text-xl font-bold text-white">KamaoNow Operations & Treasury Desk</h1>
+            <div className="text-xs text-emerald-400 font-mono">Real Money App Operations Desk</div>
+            <h1 className="text-lg sm:text-xl font-bold text-white">Real Money App Treasury Desk</h1>
           </div>
           <button
             type="button"
@@ -716,7 +716,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     { id: 'db-1', user_id: 'usr-demo-001', amount: 0.50, claim_date: new Date().toISOString().slice(0, 10) }
                   ], null, 2)}
                   {dbTable === 'admin_users' && JSON.stringify([
-                    { id: 'adm-1', name: 'Super Admin', email: 'admin@kamaonow.com', role: 'super_admin' }
+                    { id: 'adm-1', name: 'Super Admin', email: 'admin@realmoneyapp.online', role: 'super_admin' }
                   ], null, 2)}
                 </pre>
               </div>
@@ -725,9 +725,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-xs">
                 <div className="font-bold text-emerald-300 mb-1">⚡ Cloudflare D1 Setup Commands (Zero Cost):</div>
                 <div className="font-mono text-[11px] text-slate-300 space-y-1 bg-black/40 p-2.5 rounded-xl border border-white/10 select-all">
-                  <div>1. npx wrangler d1 create kamaonow-d1</div>
-                  <div>2. npx wrangler d1 execute kamaonow-d1 --file=./schema.sql</div>
-                  <div>3. npx wrangler r2 bucket create kamaonow-proofs</div>
+                  <div>1. npx wrangler d1 create realmoney-d1</div>
+                  <div>2. npx wrangler d1 execute realmoney-d1 --file=./schema.sql</div>
+                  <div>3. npx wrangler r2 bucket create realmoney-proofs</div>
                   <div>4. npx wrangler pages deploy dist</div>
                 </div>
               </div>

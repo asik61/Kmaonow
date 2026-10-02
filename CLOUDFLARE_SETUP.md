@@ -1,15 +1,16 @@
-# 🚀 KamaoNow - Cloudflare 100% Free Stack Setup Guide
+# 🚀 Real Money App - Cloudflare 100% Free Stack Setup Guide
 
-Aapke architecture diagram ke mutabiq yeh setup **100% Free (Zero Cost)** hai aur 50,000+ users ko easily handle karta hai.
+Aapke architecture plan ke mutabiq yeh setup **100% Free (Zero Cost)** hai aur 50,000+ daily users ko easily handle karta hai.
 
 ---
 
-## 🏗️ System Components:
-1. **Frontend**: Cloudflare Pages (Unlimited Free Requests, Global Edge CDN, PWA)
-2. **Backend API**: Cloudflare Workers / Pages Functions (`functions/api/[[route]].ts`)
-3. **Database**: Cloudflare D1 (5 GB Storage, 5 Million reads/day, 100K writes/day)
-4. **File Storage**: Cloudflare R2 (`kamaonow-proofs` bucket for Task Screenshots - 10 GB Free)
-5. **Authentication**: Supabase Auth (50,000 Monthly Active Users Free)
+## 🏗️ System Components & Hosting:
+1. **Frontend Hosting**: **Cloudflare Pages** (100% Free Unlimited Bandwidth, Global Edge CDN, Free SSL)
+2. **Custom Domain**: `realmoneyapp.online` (Cloudflare DNS se connected)
+3. **Backend API**: Cloudflare Workers / Pages Functions (`functions/api/[[route]].ts`)
+4. **Database**: Cloudflare D1 (5 GB Storage, 5 Million reads/day, 100K writes/day Free) / Firebase Firestore
+5. **File Storage**: Cloudflare R2 (`realmoney-proofs` bucket for Screenshots - 10 GB Free)
+6. **Mobile APK**: PWABuilder / TWA (Amazon, Vivo, Mi GetApps, Play Store ready)
 
 ---
 

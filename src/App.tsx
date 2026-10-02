@@ -24,6 +24,8 @@ import {
   ExternalLink,
   Bell,
   LogOut,
+  Camera,
+  Upload,
 } from 'lucide-react';
 
 import type {
@@ -221,7 +223,24 @@ export default function App() {
       pending_balance: prev.pending_balance + targetTask.reward_amount,
     }));
 
-    showToast(`Proof uploaded for ${targetTask.title}! Under review.`);
+    // In-App Notification
+    const notif: InAppNotification = {
+      id: `notif-${Date.now()}`,
+      title: `📸 Screenshot Submit Ho Gaya!`,
+      message: `${targetTask.title} ka proof receive ho gaya hai. Review ke baad ₹${targetTask.reward_amount.toFixed(2)} wallet me jud jayega.`,
+      type: 'task',
+      timestamp: new Date().toISOString(),
+      read: false,
+      actionTab: 'tasks',
+    };
+    setNotifications((prev) => [notif, ...prev]);
+
+    // Out-of-App Push Notification
+    sendOutPushNotification('Real Money App 📸', {
+      body: `Screenshot received for ${targetTask.title}! Admin review me hai.`,
+    }).catch(console.warn);
+
+    showToast(`Screenshot submit ho gaya! ₹${targetTask.reward_amount.toFixed(2)} under review hai. 🎉`);
   };
 
   // Spin Reward Won
@@ -928,9 +947,10 @@ export default function App() {
                     </span>
                     <button
                       type="button"
-                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#34D399] hover:to-[#10B981] text-white font-black text-xs shadow-md transition-all"
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#34D399] hover:to-[#10B981] text-white font-black text-xs shadow-md transition-all flex items-center gap-1.5"
                     >
-                      Start
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Upload Proof</span>
                     </button>
                   </div>
                 </div>
@@ -982,6 +1002,29 @@ export default function App() {
               ))}
             </div>
 
+            {/* Direct Screenshot Upload Action Banner */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                  <Camera className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black">Screenshot Bhejein &amp; Paise Paayein 📸</h4>
+                  <p className="text-[11px] text-emerald-100 font-medium">
+                    Task pura karke Gallery ya Camera se proof bhejein
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTask(tasks[0])}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-sm shrink-0 cursor-pointer flex items-center gap-1"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload</span>
+              </button>
+            </div>
+
             {/* Task Cards List (CRISP WHITE) */}
             <div className="space-y-3">
               {filteredTasks.map((task) => (
@@ -1011,9 +1054,10 @@ export default function App() {
                     </span>
                     <button
                       type="button"
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#34D399] hover:to-[#10B981] text-white font-black text-xs transition-colors shadow-md"
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#34D399] hover:to-[#10B981] text-white font-black text-xs transition-colors shadow-md flex items-center gap-1.5"
                     >
-                      Start
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Upload Proof</span>
                     </button>
                   </div>
                 </div>

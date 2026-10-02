@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { UserProfile } from '../types/kamaonow';
 import { KamaoNowLogo3D } from './Illustrations3D';
+import { loginWithFirebaseGoogle, syncUserProfile } from '../services/firebase';
 
 interface AuthScreenProps {
   onLoginSuccess: (user: UserProfile, isNewUser: boolean) => void;
@@ -64,10 +65,25 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   const [customEmail, setCustomEmail] = useState('');
   const [showAddGoogleAccount, setShowAddGoogleAccount] = useState(false);
 
-  // 1. Google 1-Tap Trigger
-  const handleStartGoogleAuth = () => {
+  // 1. Google 1-Tap Trigger with Real Firebase Auth
+  const handleStartGoogleAuth = async () => {
     setError('');
-    setStage('google-chooser');
+    setLoading(true);
+    try {
+      const realUser = await loginWithFirebaseGoogle();
+      setGoogleUser({
+        name: realUser.name,
+        email: realUser.email,
+        avatar: realUser.photoURL,
+      });
+      setName(realUser.name);
+      setLoading(false);
+      setStage('link-phone');
+    } catch (err: unknown) {
+      console.warn('Firebase popup was cancelled or blocked in preview iframe, opening account chooser fallback:', err);
+      setLoading(false);
+      setStage('google-chooser');
+    }
   };
 
   // 2. Choose Google Account
@@ -154,6 +170,8 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       };
 
       setCreatedProfile({ user: finalUser, isNew: true });
+      // Sync to real Firestore database
+      syncUserProfile(finalUser).catch(console.error);
       setStage('success-bonus');
     }, 700);
   };

@@ -66,6 +66,7 @@ import { HomeBannerSlider } from './components/HomeBannerSlider';
 import { EarningsCardImage } from './components/EarningsCardImage';
 import { AuthScreen } from './components/AuthScreen';
 import { SplashScreen } from './components/SplashScreen';
+import { testConnection, syncUserWallet, logoutFromFirebase } from './services/firebase';
 
 type NavTab = 'home' | 'tasks' | 'spin' | 'scratch' | 'profile' | 'offers' | 'refer' | 'daily' | 'withdraw';
 
@@ -135,7 +136,11 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Sync state to localStorage
+  // Sync state to localStorage & test Firestore connection
+  useEffect(() => {
+    testConnection().catch(console.warn);
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('kamaonow_user', JSON.stringify(user));
   }, [user]);
@@ -533,6 +538,8 @@ export default function App() {
         created_at: new Date().toISOString(),
       };
       setLedger((prev) => [newEntry, ...prev]);
+      // Sync wallet to Firestore
+      syncUserWallet(loggedInUser.id, updatedWallet).catch(console.error);
       showToast(`Welcome ${loggedInUser.name}! ₹${welcomeBonus} bonus credited! 🎉`);
     } else {
       showToast(`Welcome back, ${loggedInUser.name}! 👋`);
@@ -540,6 +547,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    logoutFromFirebase().catch(console.warn);
     localStorage.removeItem('kamaonow_user');
     setIsLoggedIn(false);
     showToast('Logged out successfully.');

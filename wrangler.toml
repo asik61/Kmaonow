@@ -1,0 +1,7 @@
+name = "kmaonow"
+main = "worker.ts"
+compatibility_date = "2026-10-01"
+send_metrics = false
+
+[assets]
+directory = "./dist"

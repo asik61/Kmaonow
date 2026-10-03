@@ -116,10 +116,10 @@ export const HomeBannerSlider: React.FC<HomeBannerSliderProps> = ({ onNavigate }
                   Invite Friends
                 </text>
                 <text x="0" y="48" fill="#FACC15" fontSize="46" fontWeight="900" fontFamily="system-ui, sans-serif" letterSpacing="-0.5">
-                  Earn ₹3 Every Friend!
+                  Earn ₹5 Every Friend!
                 </text>
                 <text x="0" y="85" fill="#D1FAE5" fontSize="19" fontWeight="600" fontFamily="system-ui, sans-serif">
-                  Unlimited cash added directly to your wallet.
+                  Dost ke 1st task complete karne par ₹5 seedha wallet me.
                 </text>
               </g>
 
@@ -158,7 +158,7 @@ export const HomeBannerSlider: React.FC<HomeBannerSliderProps> = ({ onNavigate }
                   <rect x="-62" y="-18" width="124" height="36" rx="18" fill="#10B981" stroke="#34D399" strokeWidth="2" filter="url(#cardGlowCyber)" />
                   <circle cx="-42" cy="0" r="10" fill="#FFFFFF" />
                   <text x="-42" y="4" textAnchor="middle" fill="#047857" fontSize="12" fontWeight="900">✓</text>
-                  <text x="14" y="5" textAnchor="middle" fill="#FFFFFF" fontSize="13" fontWeight="900">+₹3.00 Added</text>
+                  <text x="14" y="5" textAnchor="middle" fill="#FFFFFF" fontSize="13" fontWeight="900">+₹5.00 Added</text>
                 </g>
               </g>
 

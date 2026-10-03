@@ -111,7 +111,8 @@ export async function syncUserWallet(userId: string, wallet: WalletState): Promi
       doc(db, 'wallets', userId),
       {
         user_id: userId,
-        balance: wallet.balance,
+        balance: wallet.available_balance,
+        available_balance: wallet.available_balance,
         pending_balance: wallet.pending_balance,
         lifetime_earned: wallet.lifetime_earned,
         lifetime_withdrawn: wallet.lifetime_withdrawn,

@@ -10,6 +10,9 @@ export interface UserProfile {
   role: 'user' | 'admin';
   avatar_url?: string;
   created_at: string;
+  device_id?: string;
+  device_model?: string;
+  last_active?: string;
 }
 
 export type TaskCategory = 'All' | 'Installed' | 'Register' | 'Survey';
@@ -29,6 +32,8 @@ export interface TaskItem {
   is_active: boolean;
   is_top_offer?: boolean;
   is_trending?: boolean;
+  is_admin_created?: boolean;
+  created_by?: string;
   created_at: string;
 }
 
@@ -43,6 +48,7 @@ export interface TaskSubmission {
   task_title: string;
   reward_amount: number;
   proof_file_id: string; // base64 or image url
+  proof_screenshot_url?: string;
   screenshot_size_kb?: number;
   status: SubmissionStatus;
   admin_note?: string;
@@ -134,3 +140,16 @@ export interface DailyBonusRecord {
   claim_date: string;
   created_at: string;
 }
+
+export interface BroadcastNotice {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'alert';
+  is_active: boolean;
+  created_at: string;
+  author?: string;
+  target_user_id?: string;
+  action_tab?: string;
+}
+

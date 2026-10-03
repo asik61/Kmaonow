@@ -26,6 +26,8 @@ import {
   LogOut,
   Camera,
   Upload,
+  FileText,
+  Plus,
 } from 'lucide-react';
 
 import type {
@@ -38,6 +40,7 @@ import type {
   WithdrawalRequest,
   TaskCategory,
   WithdrawalMethod,
+  BroadcastNotice,
 } from './types/kamaonow';
 
 import {
@@ -48,6 +51,9 @@ import {
   INITIAL_LEDGER,
   INITIAL_REFERRALS,
   INITIAL_WITHDRAWALS,
+  INITIAL_USERS_LIST,
+  INITIAL_WALLETS_MAP,
+  INITIAL_NOTICES,
 } from './data/initialData';
 
 import {
@@ -70,6 +76,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { SplashScreen } from './components/SplashScreen';
 import { testConnection, syncUserWallet, logoutFromFirebase } from './services/firebase';
 import { NotificationModal } from './components/NotificationModal';
+import { RulesModal } from './components/RulesModal';
 import {
   type InAppNotification,
   INITIAL_NOTIFICATIONS,
@@ -77,6 +84,40 @@ import {
 } from './services/notifications';
 
 type NavTab = 'home' | 'tasks' | 'spin' | 'scratch' | 'profile' | 'offers' | 'refer' | 'daily' | 'withdraw';
+
+const TaskIconBadge: React.FC<{
+  imageUrl?: string;
+  iconLabel?: string;
+  iconBg?: string;
+  className?: string;
+  altTitle?: string;
+}> = ({
+  imageUrl,
+  iconLabel = 'NEW',
+  iconBg = '#059669',
+  className = 'w-11 h-11',
+  altTitle = 'Icon',
+}) => {
+  const [imgError, setImgError] = useState(false);
+  if (imageUrl && !imgError) {
+    return (
+      <img
+        src={imageUrl}
+        alt={altTitle}
+        onError={() => setImgError(true)}
+        className={`${className} rounded-2xl object-cover shrink-0 shadow-md border border-slate-200/90 bg-white`}
+      />
+    );
+  }
+  return (
+    <div
+      style={{ backgroundColor: iconBg }}
+      className={`${className} rounded-2xl flex items-center justify-center font-black text-white text-xs shrink-0 shadow-md border border-white/30`}
+    >
+      {iconLabel}
+    </div>
+  );
+};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
@@ -96,17 +137,57 @@ export default function App() {
 
   const [wallet, setWallet] = useState<WalletState>(() => {
     const saved = localStorage.getItem('kamaonow_wallet');
-    return saved ? JSON.parse(saved) : INITIAL_WALLET;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // If demo user or user with 0 earned, ensure clean 0.00 lifetime_withdrawn
+        if (parsed.user_id === 'usr-rohan-01' || (parsed.lifetime_earned === 0 && parsed.available_balance === 0)) {
+          return INITIAL_WALLET;
+        }
+        return parsed;
+      } catch {
+        return INITIAL_WALLET;
+      }
+    }
+    return INITIAL_WALLET;
   });
 
   const [tasks, setTasks] = useState<TaskItem[]>(() => {
     const saved = localStorage.getItem('kamaonow_tasks');
-    return saved ? JSON.parse(saved) : INITIAL_TASKS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Keep only tasks created by Admin from Admin Panel (remove all demo offers)
+          return parsed.filter(
+            (t: TaskItem) =>
+              t.is_admin_created ||
+              t.created_by === 'admin' ||
+              t.id.startsWith('task-admin-')
+          );
+        }
+        return [];
+      } catch {
+        return [];
+      }
+    }
+    return INITIAL_TASKS;
   });
 
   const [submissions, setSubmissions] = useState<TaskSubmission[]>(() => {
     const saved = localStorage.getItem('kamaonow_submissions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((s: TaskSubmission) => !['sub-001', 'sub-002', 'sub-003'].includes(s.id));
+        }
+        return [];
+      } catch {
+        return [];
+      }
+    }
+    return INITIAL_SUBMISSIONS;
   });
 
   const [ledger, setLedger] = useState<LedgerItem[]>(() => {
@@ -121,12 +202,35 @@ export default function App() {
 
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(() => {
     const saved = localStorage.getItem('kamaonow_withdrawals');
-    return saved ? JSON.parse(saved) : INITIAL_WITHDRAWALS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Remove any mock demo withdrawals incorrectly assigned to demo user
+          return parsed.filter((w: WithdrawalRequest) => !(w.user_id === 'usr-rohan-01' && (w.id === 'wdr-1' || w.id === 'wdr-2' || w.id.startsWith('wdr-10'))));
+        }
+        return INITIAL_WITHDRAWALS;
+      } catch {
+        return INITIAL_WITHDRAWALS;
+      }
+    }
+    return INITIAL_WITHDRAWALS;
+  });
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const [dailySpinClaimed, setDailySpinClaimed] = useState<boolean>(() => {
+    const savedDate = localStorage.getItem('realmoney_spin_date');
+    return savedDate === new Date().toISOString().slice(0, 10);
+  });
+
+  const [dailyScratchClaimed, setDailyScratchClaimed] = useState<boolean>(() => {
+    const savedDate = localStorage.getItem('realmoney_scratch_date');
+    return savedDate === new Date().toISOString().slice(0, 10);
   });
 
   const [freeSpinsLeft, setFreeSpinsLeft] = useState<number>(() => {
-    const saved = localStorage.getItem('kamaonow_spins');
-    return saved ? Number(saved) : 1;
+    return localStorage.getItem('realmoney_spin_date') === new Date().toISOString().slice(0, 10) ? 0 : 1;
   });
 
   const [dailyBonusClaimed, setDailyBonusClaimed] = useState<boolean>(() => {
@@ -140,6 +244,23 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+
+  // Admin & Multi-User Directory State
+  const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
+    const saved = localStorage.getItem('kamaonow_all_users');
+    return saved ? JSON.parse(saved) : INITIAL_USERS_LIST;
+  });
+
+  const [allWallets, setAllWallets] = useState<Record<string, WalletState>>(() => {
+    const saved = localStorage.getItem('kamaonow_all_wallets');
+    return saved ? JSON.parse(saved) : INITIAL_WALLETS_MAP;
+  });
+
+  const [notices, setNotices] = useState<BroadcastNotice[]>(() => {
+    const saved = localStorage.getItem('kamaonow_notices');
+    return saved ? JSON.parse(saved) : INITIAL_NOTICES;
+  });
 
   // Notifications State
   const [notifications, setNotifications] = useState<InAppNotification[]>(() => {
@@ -154,6 +275,37 @@ export default function App() {
   // Sync state to localStorage & test Firestore connection
   useEffect(() => {
     testConnection().catch(console.warn);
+
+    // Auto-migrate legacy localStorage to ensure clean 1st withdrawal and clean custom offers
+    const MIGRATION_KEY = 'realmoney_v12_clean_all_demo_offers';
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      if (user.id === 'usr-rohan-01' || (wallet.lifetime_earned === 0 && wallet.available_balance === 0)) {
+        setWallet(INITIAL_WALLET);
+        localStorage.setItem('kamaonow_wallet', JSON.stringify(INITIAL_WALLET));
+      }
+      setWithdrawals((prev) => {
+        const cleaned = prev.filter((w) => !(w.user_id === 'usr-rohan-01' && (w.id === 'wdr-1' || w.id === 'wdr-2' || w.id.startsWith('wdr-10'))));
+        localStorage.setItem('kamaonow_withdrawals', JSON.stringify(cleaned));
+        return cleaned;
+      });
+      setTasks((prev) => {
+        // Keep ONLY admin-created tasks, wipe all demo tasks as requested
+        const cleaned = prev.filter(
+          (t) =>
+            t.is_admin_created ||
+            t.created_by === 'admin' ||
+            t.id.startsWith('task-admin-')
+        );
+        localStorage.setItem('kamaonow_tasks', JSON.stringify(cleaned));
+        return cleaned;
+      });
+      setSubmissions((prev) => {
+        const cleaned = prev.filter((s) => !['sub-001', 'sub-002', 'sub-003'].includes(s.id));
+        localStorage.setItem('kamaonow_submissions', JSON.stringify(cleaned));
+        return cleaned;
+      });
+      localStorage.setItem(MIGRATION_KEY, 'done');
+    }
   }, []);
 
   useEffect(() => {
@@ -163,6 +315,35 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('kamaonow_wallet', JSON.stringify(wallet));
   }, [wallet]);
+
+  useEffect(() => {
+    localStorage.setItem('kamaonow_all_users', JSON.stringify(allUsers));
+  }, [allUsers]);
+
+  useEffect(() => {
+    localStorage.setItem('kamaonow_all_wallets', JSON.stringify(allWallets));
+  }, [allWallets]);
+
+  useEffect(() => {
+    localStorage.setItem('kamaonow_notices', JSON.stringify(notices));
+  }, [notices]);
+
+  // Sync current user & wallet into allUsers & allWallets
+  useEffect(() => {
+    setAllUsers((prev) => {
+      const idx = prev.findIndex((u) => u.id === user.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], ...user };
+        return copy;
+      }
+      return [user, ...prev];
+    });
+    setAllWallets((prev) => ({
+      ...prev,
+      [user.id]: wallet,
+    }));
+  }, [user, wallet]);
 
   useEffect(() => {
     localStorage.setItem('kamaonow_tasks', JSON.stringify(tasks));
@@ -243,9 +424,13 @@ export default function App() {
     showToast(`Screenshot submit ho gaya! ₹${targetTask.reward_amount.toFixed(2)} under review hai. 🎉`);
   };
 
-  // Spin Reward Won
+  // Spin Reward Won (Daily 1 Free Spin Only)
   const handleSpinWon = (amount: number) => {
-    setFreeSpinsLeft((prev) => Math.max(0, prev - 1));
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('realmoney_spin_date', today);
+    setDailySpinClaimed(true);
+    setFreeSpinsLeft(0);
+
     setWallet((prev) => ({
       ...prev,
       available_balance: Number((prev.available_balance + amount).toFixed(2)),
@@ -258,15 +443,19 @@ export default function App() {
       type: 'spin_reward',
       amount,
       status: 'credit',
-      description: `Lucky Spin & Win Reward: ₹${amount.toFixed(2)}`,
+      description: `Daily Lucky Spin Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
     setLedger([newEntry, ...ledger]);
-    showToast(`+₹${amount.toFixed(2)} credited to your wallet!`);
+    showToast(`+₹${amount.toFixed(2)} credited! Aaj ka free spin claimed.`);
   };
 
-  // Scratch Reward Won
+  // Scratch Reward Won (Daily 1 Free Scratch Card Only)
   const handleScratchWon = (amount: number) => {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('realmoney_scratch_date', today);
+    setDailyScratchClaimed(true);
+
     setWallet((prev) => ({
       ...prev,
       available_balance: Number((prev.available_balance + amount).toFixed(2)),
@@ -279,11 +468,11 @@ export default function App() {
       type: 'scratch_reward',
       amount,
       status: 'credit',
-      description: `Scratch & Win Reward: ₹${amount.toFixed(2)}`,
+      description: `Daily Scratch Card Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
     setLedger([newEntry, ...ledger]);
-    showToast(`+₹${amount.toFixed(2)} added directly to wallet!`);
+    showToast(`+₹${amount.toFixed(2)} credited! Aaj ka scratch card claimed.`);
   };
 
   // Daily Bonus
@@ -320,7 +509,10 @@ export default function App() {
     bankAccount?: string;
     bankIfsc?: string;
   }) => {
-    const isFirstWithdrawal = wallet.lifetime_withdrawn === 0 && withdrawals.length === 0;
+    const userRealApprovedWithdrawals = withdrawals.filter(
+      (w) => w.user_id === user.id && w.status === 'approved' && !w.id.startsWith('wdr-10')
+    );
+    const isFirstWithdrawal = (wallet.lifetime_withdrawn || 0) === 0 && userRealApprovedWithdrawals.length === 0;
     const minRequired = isFirstWithdrawal ? 20 : 100;
 
     if (payload.amount < minRequired) {
@@ -334,6 +526,20 @@ export default function App() {
 
     if (payload.amount > wallet.available_balance) {
       return { ok: false, error: 'Insufficient balance' };
+    }
+
+    // 1 UPI = 1 Account Anti-Fraud Guard
+    if (payload.upiId?.trim()) {
+      const cleanUpi = payload.upiId.trim().toLowerCase();
+      const upiUsedByOther = withdrawals.some(
+        (w) => w.user_id !== user.id && w.upi_id?.trim().toLowerCase() === cleanUpi
+      );
+      if (upiUsedByOther) {
+        return {
+          ok: false,
+          error: '❌ 1 Phone 1 Account Niyam: Yeh UPI ID pehle se kisi doosre account me used hai. Multi-account banakar duplicate UPI use karna sakht mana hai.',
+        };
+      }
     }
 
     const newWdr: WithdrawalRequest = {
@@ -393,42 +599,165 @@ export default function App() {
     const sub = submissions.find((s) => s.id === subId);
     if (!sub || sub.status !== 'pending') return;
 
+    // Check if this is the user's very first approved task (Sign-up Bonus Part 2)
+    const previouslyApprovedCount = submissions.filter(
+      (s) => s.user_id === sub.user_id && s.status === 'approved'
+    ).length;
+    const isFirstTaskApproval = previouslyApprovedCount === 0;
+    const extraFirstTaskBonus = isFirstTaskApproval ? 5 : 0;
+    const totalCredit = Number((sub.reward_amount + extraFirstTaskBonus).toFixed(2));
+
     setSubmissions((prev) =>
       prev.map((s) =>
         s.id === subId
-          ? { ...s, status: 'approved', admin_note: 'Verified and approved by Admin.', reviewed_at: new Date().toISOString() }
+          ? {
+              ...s,
+              status: 'approved',
+              admin_note: isFirstTaskApproval
+                ? 'Verified & approved by Admin. +₹5 1st Task Sign-up Bonus credited!'
+                : 'Verified and approved by Admin.',
+              reviewed_at: new Date().toISOString(),
+            }
           : s
       )
     );
 
-    setWallet((prev) => ({
-      ...prev,
-      pending_balance: Math.max(0, Number((prev.pending_balance - sub.reward_amount).toFixed(2))),
-      available_balance: Number((prev.available_balance + sub.reward_amount).toFixed(2)),
-      lifetime_earned: Number((prev.lifetime_earned + sub.reward_amount).toFixed(2)),
-    }));
+    // If approved submission is for current logged-in user, update their wallet
+    if (sub.user_id === user.id) {
+      setWallet((prev) => ({
+        ...prev,
+        pending_balance: Math.max(0, Number((prev.pending_balance - sub.reward_amount).toFixed(2))),
+        available_balance: Number((prev.available_balance + totalCredit).toFixed(2)),
+        lifetime_earned: Number((prev.lifetime_earned + totalCredit).toFixed(2)),
+      }));
+    }
 
-    const newEntry: LedgerItem = {
-      id: `led-${Date.now()}`,
-      user_id: sub.user_id,
-      type: 'task_reward',
-      amount: sub.reward_amount,
-      status: 'credit',
-      description: `Task Approved: ${sub.task_title}`,
-      created_at: new Date().toISOString(),
-    };
-    setLedger((prev) => [newEntry, ...prev]);
+    const newEntries: LedgerItem[] = [
+      {
+        id: `led-${Date.now()}`,
+        user_id: sub.user_id,
+        type: 'task_reward',
+        amount: sub.reward_amount,
+        status: 'credit',
+        description: `Task Approved: ${sub.task_title}`,
+        created_at: new Date().toISOString(),
+      },
+    ];
 
-    setReferrals((prev) =>
-      prev.map((r) => {
-        if (r.referred_user_id === sub.user_id && r.status === 'pending') {
-          return { ...r, status: 'qualified', qualified_at: new Date().toISOString() };
+    if (isFirstTaskApproval) {
+      newEntries.push({
+        id: `led-bonus-${Date.now()}`,
+        user_id: sub.user_id,
+        type: 'daily_bonus',
+        amount: 5,
+        status: 'credit',
+        description: 'Sign-up Welcome Bonus: ₹5.00 (1st Task Completed)',
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    setLedger((prev) => [...newEntries, ...prev]);
+
+    // RULE: If 1st task approval, also credit ₹5.00 to the Referrer!
+    if (isFirstTaskApproval) {
+      const pendingRef = referrals.find(
+        (r) => r.referred_user_id === sub.user_id && r.status === 'pending'
+      );
+      const targetUserObj = allUsers.find((u) => u.id === sub.user_id);
+      const referrerUser = targetUserObj?.referred_by
+        ? allUsers.find(
+            (u) =>
+              u.referral_code === targetUserObj.referred_by ||
+              u.id === targetUserObj.referred_by
+          )
+        : null;
+      const effectiveReferrerId = pendingRef?.referrer_id || referrerUser?.id;
+
+      if (effectiveReferrerId) {
+        // 1. Mark referral as qualified with ₹5.00 reward
+        setReferrals((prev) =>
+          prev.map((r) =>
+            r.referred_user_id === sub.user_id
+              ? { ...r, status: 'qualified', reward_amount: 5.0, qualified_at: new Date().toISOString() }
+              : r
+          )
+        );
+
+        // 2. If current user is the referrer, credit their wallet directly
+        if (effectiveReferrerId === user.id) {
+          setWallet((prev) => ({
+            ...prev,
+            available_balance: Number((prev.available_balance + 5.0).toFixed(2)),
+            lifetime_earned: Number((prev.lifetime_earned + 5.0).toFixed(2)),
+          }));
+
+          setLedger((prev) => [
+            {
+              id: `led-ref-${Date.now()}`,
+              user_id: user.id,
+              type: 'referral_bonus',
+              amount: 5.0,
+              status: 'credit',
+              description: `Referral Bonus: ${sub.user_name} completed 1st task (+₹5.00)`,
+              created_at: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+
+          const refNotif: InAppNotification = {
+            id: `notif-ref-${Date.now()}`,
+            title: '🎉 ₹5.00 Referral Bonus Received!',
+            message: `Aapke dost ${sub.user_name} ne pehla task complete kar liya hai! ₹5.00 aapke wallet me jud gaya hai.`,
+            type: 'referral',
+            timestamp: new Date().toISOString(),
+            read: false,
+            actionTab: 'refer',
+          };
+          setNotifications((prev) => [refNotif, ...prev]);
         }
-        return r;
-      })
-    );
 
-    showToast(`Approved! ₹${sub.reward_amount.toFixed(2)} added to user wallet.`);
+        // 3. Update allWallets map for the referrer
+        setAllWallets((prevMap) => {
+          const rWal = prevMap[effectiveReferrerId] || {
+            id: `wal-${effectiveReferrerId}`,
+            user_id: effectiveReferrerId,
+            available_balance: 0,
+            pending_balance: 0,
+            lifetime_earned: 0,
+            lifetime_withdrawn: 0,
+            updated_at: new Date().toISOString(),
+          };
+          return {
+            ...prevMap,
+            [effectiveReferrerId]: {
+              ...rWal,
+              available_balance: Number((rWal.available_balance + 5.0).toFixed(2)),
+              lifetime_earned: Number((rWal.lifetime_earned + 5.0).toFixed(2)),
+              updated_at: new Date().toISOString(),
+            },
+          };
+        });
+      }
+
+      if (sub.user_id === user.id) {
+        const notif: InAppNotification = {
+          id: `notif-1st-${Date.now()}`,
+          title: '🎉 ₹5.00 Sign-up Bonus Credited!',
+          message: 'Aapne apna pehla task successfully complete kar liya hai! ₹5.00 Sign-up bonus aapke wallet me add ho gaya hai.',
+          type: 'bonus',
+          timestamp: new Date().toISOString(),
+          read: false,
+          actionTab: 'home',
+        };
+        setNotifications((prev) => [notif, ...prev]);
+      }
+    }
+
+    showToast(
+      isFirstTaskApproval
+        ? `Approved! ₹${sub.reward_amount.toFixed(2)} + ₹5 Sign-up Bonus credited! (Referrer also received ₹5) 🎉`
+        : `Approved! ₹${sub.reward_amount.toFixed(2)} added to user wallet.`
+    );
   };
 
   const handleAdminRejectSubmission = (subId: string, note: string) => {
@@ -522,60 +851,206 @@ export default function App() {
   const handleAdminSaveTask = (taskData: Partial<TaskItem>) => {
     if (taskData.id) {
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskData.id ? ({ ...t, ...taskData } as TaskItem) : t))
+        prev.map((t) =>
+          t.id === taskData.id
+            ? ({ ...t, ...taskData, is_admin_created: true, created_by: 'admin' } as TaskItem)
+            : t
+        )
       );
-      showToast('Task updated successfully!');
+      showToast('Offer updated successfully! ✓');
     } else {
       const newTask: TaskItem = {
-        id: `task-${Date.now()}`,
+        id: `task-admin-${Date.now()}`,
+        created_by: 'admin',
+        is_admin_created: true,
         title: taskData.title || 'New CPA Task',
         subtitle: taskData.subtitle || 'Install & Register',
         description: taskData.description || 'Complete registration and submit proof.',
         category: taskData.category || 'Register',
-        reward_amount: taskData.reward_amount || 50,
+        reward_amount: Number(taskData.reward_amount) || 50,
         instructions: taskData.instructions || ['Install the app.', 'Complete registration.', 'Upload proof.'],
         partner_url: taskData.partner_url || 'https://google.com',
         icon_label: taskData.icon_label || 'NEW',
         icon_bg: taskData.icon_bg || '#059669',
-        is_active: true,
+        image_url: taskData.image_url || '',
+        is_active: taskData.is_active !== false,
+        is_top_offer: !!taskData.is_top_offer,
+        is_trending: !!taskData.is_trending,
         created_at: new Date().toISOString(),
       };
       setTasks([newTask, ...tasks]);
-      showToast('New task published!');
+      showToast('New offer created and published! 🚀');
     }
+  };
+
+  const handleAdminToggleTaskActive = (taskId: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    const willBeActive = target ? target.is_active === false : true;
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, is_active: willBeActive } : t))
+    );
+    showToast(
+      willBeActive
+        ? `"${target?.title}" is now LIVE! 🟢`
+        : `"${target?.title}" has been PAUSED. ⏸️`
+    );
   };
 
   const handleAdminDeleteTask = (taskId: string) => {
+    const target = tasks.find((t) => t.id === taskId);
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    showToast('Task deleted.');
+    showToast(`"${target?.title || 'Offer'}" deleted successfully.`);
   };
 
   const handleAdminToggleUserBlock = (userId: string) => {
+    setAllUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, is_blocked: !u.is_blocked } : u))
+    );
     if (userId === user.id) {
       setUser((prev) => ({ ...prev, is_blocked: !prev.is_blocked }));
     }
+    const target = allUsers.find((u) => u.id === userId);
+    showToast(
+      target?.is_blocked
+        ? `Account ${target?.name} Unblocked! ✓`
+        : `Account ${target?.name} Blocked / Banned! 🚫`
+    );
   };
 
   const handleAdminAdjustBalance = (userId: string, amount: number, note: string) => {
+    const targetUser = allUsers.find((u) => u.id === userId);
+    const targetName = targetUser?.name || 'User';
+
+    setAllWallets((prev) => {
+      const current = prev[userId] || {
+        id: `wal-${userId}`,
+        user_id: userId,
+        available_balance: 0,
+        pending_balance: 0,
+        lifetime_earned: 0,
+        lifetime_withdrawn: 0,
+        updated_at: new Date().toISOString(),
+      };
+      return {
+        ...prev,
+        [userId]: {
+          ...current,
+          available_balance: Math.max(0, Number((current.available_balance + amount).toFixed(2))),
+          lifetime_earned:
+            amount > 0 ? Number((current.lifetime_earned + amount).toFixed(2)) : current.lifetime_earned,
+          updated_at: new Date().toISOString(),
+        },
+      };
+    });
+
     if (userId === user.id) {
       setWallet((prev) => ({
         ...prev,
         available_balance: Math.max(0, Number((prev.available_balance + amount).toFixed(2))),
-        lifetime_earned: amount > 0 ? Number((prev.lifetime_earned + amount).toFixed(2)) : prev.lifetime_earned,
+        lifetime_earned:
+          amount > 0 ? Number((prev.lifetime_earned + amount).toFixed(2)) : prev.lifetime_earned,
       }));
-
-      const newEntry: LedgerItem = {
-        id: `led-${Date.now()}`,
-        user_id: user.id,
-        type: 'admin_adjust',
-        amount: Math.abs(amount),
-        status: amount >= 0 ? 'credit' : 'debit',
-        description: `Admin balance adjust: ${note}`,
-        created_at: new Date().toISOString(),
-      };
-      setLedger((prev) => [newEntry, ...prev]);
-      showToast(`Balance adjusted by ₹${amount.toFixed(2)}`);
     }
+
+    const newEntry: LedgerItem = {
+      id: `led-${Date.now()}`,
+      user_id: userId,
+      type: 'admin_adjust',
+      amount: Math.abs(amount),
+      status: amount >= 0 ? 'credit' : 'debit',
+      description: `Admin balance adjust: ${note}`,
+      created_at: new Date().toISOString(),
+    };
+    setLedger((prev) => [newEntry, ...prev]);
+
+    if (userId === user.id) {
+      const notif: InAppNotification = {
+        id: `notif-${Date.now()}`,
+        title: amount >= 0 ? '🎁 Admin Manual Bonus Credited!' : '⚠️ Wallet Balance Adjusted',
+        message: `${note} (${amount >= 0 ? '+' : '-'}₹${Math.abs(amount).toFixed(2)})`,
+        type: 'bonus',
+        timestamp: new Date().toISOString(),
+        read: false,
+        actionTab: 'home',
+      };
+      setNotifications((prev) => [notif, ...prev]);
+    }
+
+    showToast(`${targetName} wallet adjusted by ${amount >= 0 ? '+' : ''}₹${amount.toFixed(2)}`);
+  };
+
+  const handleAdminSaveNotice = (noticeData: Partial<BroadcastNotice>) => {
+    if (noticeData.id) {
+      setNotices((prev) =>
+        prev.map((n) => (n.id === noticeData.id ? ({ ...n, ...noticeData } as BroadcastNotice) : n))
+      );
+      showToast('Broadcast notice updated! 📢');
+    } else {
+      const newNotice: BroadcastNotice = {
+        id: `notice-${Date.now()}`,
+        title: noticeData.title || '📢 Announcement',
+        message: noticeData.message || '',
+        type: noticeData.type || 'success',
+        is_active: noticeData.is_active !== false,
+        created_at: new Date().toISOString(),
+        author: 'Admin Ops Desk',
+      };
+      setNotices([newNotice, ...notices]);
+
+      // Push notification & In-App notification to users
+      const newNotif: InAppNotification = {
+        id: `notif-broadcast-${Date.now()}`,
+        title: newNotice.title,
+        message: newNotice.message,
+        type: 'system',
+        timestamp: new Date().toISOString(),
+        read: false,
+        actionTab: 'home',
+      };
+      setNotifications((prev) => [newNotif, ...prev]);
+
+      sendOutPushNotification(`Real Money App: ${newNotice.title}`, {
+        body: newNotice.message,
+      }).catch(console.warn);
+
+      showToast('Broadcast message sent to all users! 📢');
+    }
+  };
+
+  const handleAdminDeleteNotice = (noticeId: string) => {
+    setNotices((prev) => prev.filter((n) => n.id !== noticeId));
+    showToast('Notice deleted.');
+  };
+
+  const handleAdminToggleNoticeActive = (noticeId: string) => {
+    setNotices((prev) =>
+      prev.map((n) => (n.id === noticeId ? { ...n, is_active: !n.is_active } : n))
+    );
+    showToast('Notice status updated.');
+  };
+
+  const handleAdminSendUserDirectMessage = (userId: string, title: string, message: string) => {
+    const targetUser = allUsers.find((u) => u.id === userId);
+    const targetName = targetUser?.name || 'User';
+
+    if (userId === user.id) {
+      const personalNotif: InAppNotification = {
+        id: `notif-dm-${Date.now()}`,
+        title,
+        message,
+        type: 'system',
+        timestamp: new Date().toISOString(),
+        read: false,
+        actionTab: 'home',
+      };
+      setNotifications((prev) => [personalNotif, ...prev]);
+    }
+
+    sendOutPushNotification(`Real Money App: ${title}`, {
+      body: message,
+    }).catch(console.warn);
+
+    showToast(`Notification sent to ${targetName}! ✉️`);
   };
 
   const handleResetSeed = () => {
@@ -598,29 +1073,62 @@ export default function App() {
     localStorage.setItem('kamaonow_user', JSON.stringify(loggedInUser));
     setIsLoggedIn(true);
 
-    if (isNewUser) {
-      const welcomeBonus = loggedInUser.referred_by ? 60 : 50;
-      setWallet((prev) => ({
-        ...prev,
-        available_balance: Number((prev.available_balance + welcomeBonus).toFixed(2)),
-        lifetime_earned: Number((prev.lifetime_earned + welcomeBonus).toFixed(2)),
-      }));
+    setAllUsers((prev) => {
+      const exists = prev.some((u) => u.id === loggedInUser.id);
+      if (exists) {
+        return prev.map((u) => (u.id === loggedInUser.id ? { ...u, ...loggedInUser } : u));
+      }
+      return [loggedInUser, ...prev];
+    });
 
-      const newEntry: LedgerItem = {
-        id: `led-${Date.now()}`,
+    if (isNewUser) {
+      // RULE: Sign-up bonus (₹5) is credited ONLY when 1st task is completed!
+      const freshWallet: WalletState = {
+        id: `wal-${loggedInUser.id}`,
         user_id: loggedInUser.id,
-        type: 'daily_bonus',
-        amount: welcomeBonus,
-        status: 'credit',
-        description: loggedInUser.referred_by
-          ? 'Sign-up Bonus (₹50) + Referral Bonus (₹10)'
-          : 'Welcome Sign-Up Bonus: ₹50.00',
-        created_at: new Date().toISOString(),
+        available_balance: 0.0,
+        pending_balance: 0.0,
+        lifetime_earned: 0.0,
+        lifetime_withdrawn: 0.0,
+        updated_at: new Date().toISOString(),
       };
-      setLedger((prev) => [newEntry, ...prev]);
-      // Sync wallet to Firestore
-      syncUserWallet(loggedInUser.id, updatedWallet).catch(console.error);
-      showToast(`Welcome ${loggedInUser.name}! ₹${welcomeBonus} bonus credited! 🎉`);
+      setWallet(freshWallet);
+      setAllWallets((prev) => ({ ...prev, [loggedInUser.id]: freshWallet }));
+
+      // If referred by someone, record pending referral item (₹5 credited when this user does 1st task)
+      if (loggedInUser.referred_by) {
+        const referrerUser = allUsers.find(
+          (u) =>
+            u.referral_code === loggedInUser.referred_by ||
+            u.id === loggedInUser.referred_by
+        );
+        if (referrerUser) {
+          const newRef: ReferralItem = {
+            id: `ref-${Date.now()}`,
+            referrer_id: referrerUser.id,
+            referred_user_id: loggedInUser.id,
+            referred_name: loggedInUser.name,
+            status: 'pending',
+            reward_amount: 5.0,
+            created_at: new Date().toISOString(),
+          };
+          setReferrals((prev) => [newRef, ...prev]);
+        }
+      }
+
+      // 1st Task Mission notification
+      const welcomeNotif: InAppNotification = {
+        id: `notif-welcome-${Date.now()}`,
+        title: '🎯 Pehla Task Complete Karein & ₹5.00 Payein!',
+        message: 'Welcome to Real Money App! Sign-up bonus (₹5.00) unlock karne ke liye apna 1st task complete karein.',
+        type: 'bonus',
+        timestamp: new Date().toISOString(),
+        read: false,
+        actionTab: 'tasks',
+      };
+      setNotifications((prev) => [welcomeNotif, ...prev]);
+
+      showToast(`Welcome ${loggedInUser.name}! 1st task complete karein aur ₹5 Welcome Bonus paayein! 🚀`);
     } else {
       showToast(`Welcome back, ${loggedInUser.name}! 👋`);
     }
@@ -634,11 +1142,13 @@ export default function App() {
   };
 
   const filteredTasks = tasks.filter((t) => {
+    if (t.is_active === false) return false;
     if (taskCategory === 'All') return true;
     return t.category === taskCategory;
   });
 
   const filteredOffers = tasks.filter((t) => {
+    if (t.is_active === false) return false;
     if (offerCategory === 'All') return true;
     if (offerCategory === 'Top Offers') return t.is_top_offer;
     if (offerCategory === 'Trending') return t.is_trending;
@@ -652,6 +1162,11 @@ export default function App() {
   if (!isLoggedIn) {
     return <AuthScreen onLoginSuccess={handleLoginSuccess} />;
   }
+
+  const userApprovedWithdrawals = withdrawals.filter(
+    (w) => w.user_id === user.id && w.status === 'approved' && !w.id.startsWith('wdr-10')
+  );
+  const isFirstWithdrawal = (wallet.lifetime_withdrawn || 0) === 0 && userApprovedWithdrawals.length === 0;
 
   return (
     <div className="min-h-screen bg-[#F4F6F9] text-slate-900 flex flex-col font-sans pb-24 sm:pb-12 antialiased selection:bg-emerald-500/20 selection:text-emerald-950">
@@ -698,6 +1213,15 @@ export default function App() {
 
         {/* Right Slot: Notification bell (ghanta) & discreet admin trigger */}
         <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowRulesModal(true)}
+            className="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+            title="Kamaai Ke Niyam & Policy"
+          >
+            <span>📜 Niyam</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setShowAdminPanel(true)}
@@ -765,7 +1289,7 @@ export default function App() {
             </div>
 
             {/* 3. WITHDRAW NOW BUTTON (Slimmer & Mobile Friendly) */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <button
                 type="button"
                 onClick={() => setShowWithdrawModal(true)}
@@ -773,13 +1297,26 @@ export default function App() {
               >
                 Withdraw Now
               </button>
-              <div className="text-[10px] text-center font-bold text-emerald-800 flex items-center justify-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                <span>
-                  {wallet.lifetime_withdrawn === 0 && withdrawals.length === 0
-                    ? '1st Withdrawal: Min sirf ₹20 • Instant UPI Payout'
-                    : 'Minimum Withdrawal: ₹100 • Instant UPI Payout'}
-                </span>
+              <div className="flex items-center justify-center gap-1.5 flex-wrap pt-0.5">
+                <div className={`px-2.5 py-1 rounded-full border text-[11px] font-bold flex items-center gap-1 shadow-xs ${
+                  isFirstWithdrawal
+                    ? 'bg-amber-50/90 border-amber-300 text-amber-900'
+                    : 'bg-emerald-50/90 border-emerald-300 text-emerald-900'
+                }`}>
+                  <Sparkles className="w-3 h-3 text-amber-500 fill-amber-400 shrink-0" />
+                  <span>
+                    {isFirstWithdrawal
+                      ? '1st Withdrawal: Min sirf ₹20 • Instant UPI (Uske baad ₹100)'
+                      : 'Minimum Withdrawal: ₹100 • Instant UPI'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRulesModal(true)}
+                  className="text-[11px] text-emerald-700 hover:text-emerald-900 underline font-semibold cursor-pointer"
+                >
+                  Sabhi Niyam Padhein ›
+                </button>
               </div>
             </div>
 
@@ -922,45 +1459,73 @@ export default function App() {
                 </button>
               </div>
 
-              {tasks.slice(0, 3).map((task) => (
-                <div
-                  key={task.id}
-                  onClick={() => setSelectedTask(task)}
-                  className="p-3.5 rounded-2xl bg-white border border-slate-100 hover:border-emerald-300 flex items-center justify-between gap-3 cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-md transition-all active:scale-98 group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      style={{ backgroundColor: task.icon_bg || '#059669' }}
-                      className="w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white text-xs shrink-0 shadow-md border border-white/30 group-hover:scale-105 transition-transform"
-                    >
-                      {task.icon_label}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-sm font-black text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{task.title}</h4>
-                      <p className="text-[11px] text-slate-500 truncate font-medium">{task.subtitle}</p>
-                    </div>
+              {tasks.filter((t) => t.is_active !== false).length === 0 ? (
+                <div className="p-4 rounded-2xl bg-white border border-slate-100 text-center shadow-xs space-y-2 py-5">
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+                    <CheckSquare className="w-5 h-5" />
                   </div>
-
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <span className="font-mono font-black text-emerald-600 text-base">
-                      ₹{task.reward_amount.toFixed(0)}
-                    </span>
-                    {submissions.some((s) => s.task_id === task.id) ? (
-                      <span className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300">
-                        In Review
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white font-black text-xs shadow-md transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
-                      >
-                        <span>Start Offer</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                  <div className="text-xs font-bold text-slate-800">
+                    Abhi koi active task live nahi hai
                   </div>
+                  <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                    Admin Panel se jo bhi offers add honge, wo yahan live dikhenge.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPanel(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Admin Desk Se Offer Dalein</span>
+                  </button>
                 </div>
-              ))}
+              ) : (
+                tasks
+                  .filter((t) => t.is_active !== false)
+                  .slice(0, 3)
+                  .map((task) => (
+                    <div
+                      key={task.id}
+                      onClick={() => setSelectedTask(task)}
+                      className="p-3.5 rounded-2xl bg-white border border-slate-100 hover:border-emerald-300 flex items-center justify-between gap-3 cursor-pointer shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-md transition-all active:scale-98 group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <TaskIconBadge
+                          imageUrl={task.image_url}
+                          iconLabel={task.icon_label}
+                          iconBg={task.icon_bg}
+                          altTitle={task.title}
+                          className="w-11 h-11"
+                        />
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-black text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
+                            {task.title}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 truncate font-medium">{task.subtitle}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="font-mono font-black text-emerald-600 text-base">
+                          ₹{task.reward_amount.toFixed(0)}
+                        </span>
+                        {submissions.some((s) => s.task_id === task.id) ? (
+                          <span className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300">
+                            In Review
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white font-black text-xs shadow-md transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+                          >
+                            <span>Start Offer</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+              )}
             </div>
 
             {/* Bottom 4 Badges (CRISP WHITE CARDS) */}
@@ -1010,47 +1575,70 @@ export default function App() {
 
             {/* Task Cards List (CRISP WHITE) */}
             <div className="space-y-3">
-              {filteredTasks.map((task) => (
-                <div
-                  key={task.id}
-                  onClick={() => setSelectedTask(task)}
-                  className="p-4 rounded-3xl bg-white border border-slate-100 hover:border-emerald-300 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-md group active:scale-98"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div
-                      style={{ backgroundColor: task.icon_bg || '#059669' }}
-                      className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-sm shrink-0 shadow-md border border-white/30 group-hover:scale-105 transition-transform"
-                    >
-                      {task.icon_label}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
-                        {task.title}
-                      </h3>
-                      <p className="text-xs text-slate-500 truncate font-medium">{task.subtitle}</p>
-                    </div>
+              {filteredTasks.length === 0 ? (
+                <div className="p-6 rounded-3xl bg-white border border-slate-100 text-center shadow-md space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+                    <CheckSquare className="w-6 h-6" />
                   </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono font-black text-emerald-600 text-base">
-                      ₹{task.reward_amount.toFixed(0)}
-                    </span>
-                    {submissions.some((s) => s.task_id === task.id) ? (
-                      <span className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300">
-                        In Review
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white font-black text-xs transition-all shadow-md flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                      >
-                        <span>Start Offer</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Naye Tasks Jald Hi Live Honge!</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                      Yahan sirf wahi offers show honge jo aap Admin Desk se create karenge.
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPanel(true)}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Admin Desk Se Offer Add Karein</span>
+                  </button>
                 </div>
-              ))}
+              ) : (
+                filteredTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => setSelectedTask(task)}
+                    className="p-4 rounded-3xl bg-white border border-slate-100 hover:border-emerald-300 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-md group active:scale-98"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <TaskIconBadge
+                        imageUrl={task.image_url}
+                        iconLabel={task.icon_label}
+                        iconBg={task.icon_bg}
+                        altTitle={task.title}
+                        className="w-12 h-12"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
+                          {task.title}
+                        </h3>
+                        <p className="text-xs text-slate-500 truncate font-medium">{task.subtitle}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="font-mono font-black text-emerald-600 text-base">
+                        ₹{task.reward_amount.toFixed(0)}
+                      </span>
+                      {submissions.some((s) => s.task_id === task.id) ? (
+                        <span className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300">
+                          In Review
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white font-black text-xs transition-all shadow-md flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                        >
+                          <span>Start Offer</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-medium">
@@ -1065,7 +1653,11 @@ export default function App() {
         {/* ========================================================= */}
         {activeTab === 'spin' && (
           <div className="animate-fade-in">
-            <SpinWheel freeSpinsLeft={freeSpinsLeft} onRewardWon={handleSpinWon} />
+            <SpinWheel
+              freeSpinsLeft={dailySpinClaimed ? 0 : 1}
+              dailyClaimed={dailySpinClaimed}
+              onRewardWon={handleSpinWon}
+            />
           </div>
         )}
 
@@ -1074,7 +1666,10 @@ export default function App() {
         {/* ========================================================= */}
         {activeTab === 'scratch' && (
           <div className="animate-fade-in">
-            <ScratchCard onRewardWon={handleScratchWon} />
+            <ScratchCard
+              dailyClaimed={dailyScratchClaimed}
+              onRewardWon={handleScratchWon}
+            />
           </div>
         )}
 
@@ -1101,40 +1696,63 @@ export default function App() {
             </div>
 
             <div className="space-y-3">
-              {filteredOffers.map((offer) => (
-                <div
-                  key={offer.id}
-                  onClick={() => setSelectedTask(offer)}
-                  className="p-4 rounded-3xl bg-white border border-slate-100 hover:border-emerald-300 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-md group active:scale-98"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div
-                      style={{ backgroundColor: offer.icon_bg || '#059669' }}
-                      className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-sm shrink-0 shadow-md border border-white/30 group-hover:scale-105 transition-transform"
-                    >
-                      {offer.icon_label}
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
-                        {offer.title}
-                      </h3>
-                      <p className="text-xs text-slate-500 truncate font-medium">{offer.subtitle}</p>
-                    </div>
+              {filteredOffers.length === 0 ? (
+                <div className="p-6 rounded-3xl bg-white border border-slate-100 text-center shadow-md space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
+                    <Sparkles className="w-6 h-6" />
                   </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono font-black text-emerald-600 text-base">
-                      ₹{offer.reward_amount.toFixed(0)}
-                    </span>
-                    <button
-                      type="button"
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#34D399] hover:to-[#10B981] text-white font-black text-xs transition-colors shadow-md"
-                    >
-                      Start
-                    </button>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Abhi Koi Offer Live Nahi Hai</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                      Admin Desk se jo bhi offers add kiye jayenge, wo yahan live honge.
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPanel(true)}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Admin Desk Se Offer Add Karein</span>
+                  </button>
                 </div>
-              ))}
+              ) : (
+                filteredOffers.map((offer) => (
+                  <div
+                    key={offer.id}
+                    onClick={() => setSelectedTask(offer)}
+                    className="p-4 rounded-3xl bg-white border border-slate-100 hover:border-emerald-300 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-md group active:scale-98"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <TaskIconBadge
+                        imageUrl={offer.image_url}
+                        iconLabel={offer.icon_label}
+                        iconBg={offer.icon_bg}
+                        altTitle={offer.title}
+                        className="w-12 h-12"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
+                          {offer.title}
+                        </h3>
+                        <p className="text-xs text-slate-500 truncate font-medium">{offer.subtitle}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="font-mono font-black text-emerald-600 text-base">
+                        ₹{offer.reward_amount.toFixed(0)}
+                      </span>
+                      <button
+                        type="button"
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#34D399] hover:to-[#10B981] text-white font-black text-xs transition-colors shadow-md"
+                      >
+                        Start
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-medium">
@@ -1152,9 +1770,9 @@ export default function App() {
             <div className="rounded-3xl bg-gradient-to-br from-[#065F46] via-[#047857] to-[#059669] border border-emerald-400/40 p-6 text-center space-y-4 shadow-xl text-white">
               <ReferCharacter3D className="w-24 h-24 mx-auto drop-shadow-md" />
               <div>
-                <h2 className="text-xl font-black text-white">Invite Your Friends &amp; Earn ₹3</h2>
+                <h2 className="text-xl font-black text-white">Invite Your Friends &amp; Earn ₹5.00</h2>
                 <p className="text-xs text-emerald-100 mt-1">
-                  Friend sign up kare aur 1 task complete kare, aapko ₹3 seedha wallet me!
+                  Friend sign up kare aur 1st task complete kare, aapko ₹5.00 seedha wallet me milenge!
                 </p>
               </div>
 
@@ -1202,21 +1820,30 @@ export default function App() {
 
             {/* How It Works -> CRISP WHITE CARD */}
             <div className="p-5 rounded-3xl bg-white border border-slate-100 space-y-3 shadow-md text-slate-800">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                How It Works?
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  How It Works?
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowRulesModal(true)}
+                  className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+                >
+                  Full Rules &amp; Policy ›
+                </button>
+              </div>
               <ol className="space-y-2.5 text-xs text-slate-600">
                 <li className="flex items-start gap-2.5">
                   <span className="font-black text-emerald-600 font-mono">1.</span>
-                  <span>Aap apna referral code share karein.</span>
+                  <span>Apna referral code / link dost ke sath WhatsApp par share karein.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="font-black text-emerald-600 font-mono">2.</span>
-                  <span>Friend sign up kare aur 1 task complete kare.</span>
+                  <span>Friend sign up kare aur aapka referral code enter kare.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="font-black text-emerald-600 font-mono">3.</span>
-                  <span>Aapko ₹3 milega (task complete hone ke baad).</span>
+                  <span>Dost ke 1st task complete hote hi aapko <strong>₹5.00 turant</strong> wallet me mil jayenge.</span>
                 </li>
               </ol>
             </div>
@@ -1314,6 +1941,21 @@ export default function App() {
 
             {/* Menu List -> CRISP WHITE CARD */}
             <div className="rounded-3xl bg-white border border-slate-100 divide-y divide-slate-100 overflow-hidden text-xs shadow-md text-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(true)}
+                className="w-full p-4 flex items-center justify-between hover:bg-emerald-50/70 transition-colors cursor-pointer text-left bg-emerald-50/40 border-l-4 border-emerald-500"
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-emerald-700 shrink-0" />
+                  <div>
+                    <span className="font-black text-slate-900 block text-xs">Kamaai Ke Niyam &amp; Policy A to Z</span>
+                    <span className="text-[10px] text-emerald-700 font-semibold">Paisa kitna milega, withdrawal &amp; anti-fraud rules</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-emerald-600 shrink-0" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowLedgerModal(true)}
@@ -1424,6 +2066,52 @@ export default function App() {
             </div>
           </div>
         )}
+        {/* SEO & AIO INFORMATION FOOTER */}
+        <section aria-label="About Real Money App SEO Information" className="pt-4 pb-14 text-slate-700">
+          <div className="p-4 sm:p-5 rounded-3xl bg-white/80 border border-slate-200/80 shadow-xs space-y-3.5 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h2 className="font-black text-slate-900 text-xs sm:text-sm">
+                Real Money App (realmoneyapp.online) – Bharat Ka #1 Earning Platform
+              </h2>
+            </div>
+            
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Real Money App ek 100% free, zero-investment daily earning platform hai jahan aap simple tasks, 
+              CPA offers complete karke, daily 1 lucky free spin ghumakar, aur 1 free scratch card kholkar 
+              turant real cash kama sakte hain. Saara paisa bina kisi delay ke seedha aapke PhonePe, Google Pay, 
+              Paytm ya Bank Account me instant transfer hota hai.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="font-bold text-slate-900 block">🎁 ₹5.00 Welcome Bonus</span>
+                <span className="text-[10px] text-slate-500">1st Task pura karne par turant credit</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="font-bold text-slate-900 block">⚡ Instant UPI Payout</span>
+                <span className="text-[10px] text-slate-500">1st withdrawal min ₹20, uske baad ₹100</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="font-bold text-slate-900 block">🎡 Daily 1 Free Spin</span>
+                <span className="text-[10px] text-slate-500">Rozana lucky wheel se cash jeetein</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="font-bold text-slate-900 block">🎫 Daily 1 Scratch Card</span>
+                <span className="text-[10px] text-slate-500">Har raat 12 baje counter reset</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+              <span>© 2026 Real Money App • All Rights Reserved</span>
+              <div className="flex items-center gap-3">
+                <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 underline font-medium">Sitemap</a>
+                <a href="/robots.txt" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 underline font-medium">Robots</a>
+                <button type="button" onClick={() => setShowRulesModal(true)} className="hover:text-emerald-700 underline font-medium">Policies</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* ========================================================= */}
@@ -1517,11 +2205,22 @@ export default function App() {
         <WithdrawModal
           availableBalance={wallet.available_balance}
           userPhone={user.phone}
-          isFirstWithdrawal={wallet.lifetime_withdrawn === 0 && withdrawals.length === 0}
+          isFirstWithdrawal={isFirstWithdrawal}
           onClose={() => setShowWithdrawModal(false)}
           onRequestWithdrawal={handleRequestWithdrawal}
+          onOpenRules={() => setShowRulesModal(true)}
         />
       )}
+
+      {/* RULES & EARNING POLICY MODAL */}
+      <RulesModal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+        onOpenWithdrawal={() => {
+          setShowRulesModal(false);
+          setShowWithdrawModal(true);
+        }}
+      />
 
       {/* NOTIFICATIONS MODAL (In-App & Push Notification Center) */}
       {showNotificationModal && (
@@ -1602,24 +2301,30 @@ export default function App() {
         </div>
       )}
 
-      {/* ADMIN PANEL (PWA Manual Admin TaskPay Style) */}
+      {/* ADMIN PANEL (PWA Manual Admin Master Control) */}
       {showAdminPanel && (
         <AdminPanel
           tasks={tasks}
           submissions={submissions}
           withdrawals={withdrawals}
-          users={[user, { ...user, id: 'usr-priya-02', name: 'Priya Verma', phone: '9811223344' }]}
-          wallets={{ [user.id]: wallet }}
+          users={allUsers}
+          wallets={allWallets}
           ledger={ledger}
           referrals={referrals}
+          notices={notices}
           onApproveSubmission={handleAdminApproveSubmission}
           onRejectSubmission={handleAdminRejectSubmission}
           onApproveWithdrawal={handleAdminApproveWithdrawal}
           onRejectWithdrawal={handleAdminRejectWithdrawal}
           onSaveTask={handleAdminSaveTask}
+          onToggleTaskActive={handleAdminToggleTaskActive}
           onDeleteTask={handleAdminDeleteTask}
           onToggleUserBlock={handleAdminToggleUserBlock}
           onAdjustBalance={handleAdminAdjustBalance}
+          onSaveNotice={handleAdminSaveNotice}
+          onDeleteNotice={handleAdminDeleteNotice}
+          onToggleNoticeActive={handleAdminToggleNoticeActive}
+          onSendUserDirectMessage={handleAdminSendUserDirectMessage}
           onClose={() => setShowAdminPanel(false)}
         />
       )}

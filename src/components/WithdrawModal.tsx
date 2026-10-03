@@ -14,6 +14,7 @@ interface WithdrawModalProps {
     bankAccount?: string;
     bankIfsc?: string;
   }) => { ok: boolean; error?: string };
+  onOpenRules?: () => void;
 }
 
 export const WithdrawModal: React.FC<WithdrawModalProps> = ({
@@ -21,6 +22,7 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
   isFirstWithdrawal = true,
   onClose,
   onRequestWithdrawal,
+  onOpenRules,
 }) => {
   const minWithdrawal = isFirstWithdrawal ? 20 : 100;
   const quickAmounts = isFirstWithdrawal ? [20, 50, 100, 200] : [100, 200, 500, 1000];
@@ -286,6 +288,19 @@ export const WithdrawModal: React.FC<WithdrawModalProps> = ({
           >
             Request Withdrawal (₹{amount})
           </button>
+
+          {onOpenRules && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenRules();
+              }}
+              className="w-full text-center text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer py-1"
+            >
+              📜 Paisa Nikaalne Ke Sabhi Niyam Padhein ›
+            </button>
+          )}
 
           <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 pt-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />

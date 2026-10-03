@@ -1,12 +1,121 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="112" fill="#047857"/>
-  <rect x="48" y="48" width="416" height="416" rx="80" fill="#059669"/>
-  <!-- Rupee Note Shape -->
-  <rect x="110" y="150" width="292" height="180" rx="20" fill="#10B981" stroke="#ECFDF5" stroke-width="12"/>
-  <circle cx="256" cy="240" r="54" fill="#047857"/>
-  <!-- Indian Rupee Symbol -->
-  <path d="M236 210H276M236 228H272M252 210C266 210 274 218 274 228C274 238 266 246 248 246H238L274 286" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Upward Growth Arrow -->
-  <path d="M120 370L210 290L280 340L392 210" stroke="#FDE047" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M344 210H392V258" stroke="#FDE047" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064E3B" />
+      <stop offset="40%" stop-color="#047857" />
+      <stop offset="85%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+
+    <!-- Gloss Top Highlight -->
+    <linearGradient id="glossGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.38" />
+      <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Gold Coin 3D Gradient -->
+    <linearGradient id="goldCoinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="25%" stop-color="#FACC15" />
+      <stop offset="70%" stop-color="#EAB308" />
+      <stop offset="100%" stop-color="#CA8A04" />
+    </linearGradient>
+
+    <!-- Gold Coin Bevel -->
+    <linearGradient id="goldBevel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="40%" stop-color="#FDE047" />
+      <stop offset="100%" stop-color="#A16207" />
+    </linearGradient>
+
+    <!-- Rising Growth Arrow Gradient -->
+    <linearGradient id="arrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="40%" stop-color="#34D399" />
+      <stop offset="75%" stop-color="#FACC15" />
+      <stop offset="100%" stop-color="#FEF08A" />
+    </linearGradient>
+
+    <!-- Coin Shadow -->
+    <filter id="coinShadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#022c22" flood-opacity="0.65" />
+    </filter>
+
+    <!-- Arrow Shadow & Glow -->
+    <filter id="glowShadow" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#047857" flood-opacity="0.5" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#FACC15" flood-opacity="0.4" />
+    </filter>
+
+    <!-- Inner Border Glow -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6EE7B7" stop-opacity="0.8" />
+      <stop offset="50%" stop-color="#34D399" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.6" />
+    </linearGradient>
+  </defs>
+
+  <!-- 1. Squircle App Icon Base -->
+  <rect x="16" y="16" width="480" height="480" rx="116" fill="url(#bgGrad)" />
+  <rect x="22" y="22" width="468" height="468" rx="110" stroke="url(#borderGrad)" stroke-width="6" fill="none" />
+
+  <!-- 2. Glassmorphism Top Highlight Sheen -->
+  <path d="M 22 132 C 22 72, 72 22, 132 22 L 380 22 C 440 22, 490 72, 490 132 C 490 220, 360 270, 256 270 C 120 270, 22 210, 22 132 Z" fill="url(#glossGrad)" />
+
+  <!-- 3. Ambient Wealth Rings / Rays -->
+  <circle cx="256" cy="256" r="190" stroke="#34D399" stroke-opacity="0.12" stroke-width="2" stroke-dasharray="8 8" />
+  <circle cx="256" cy="256" r="150" stroke="#6EE7B7" stroke-opacity="0.16" stroke-width="2" />
+
+  <!-- 4. Dynamic Rising Growth Path (Behind Coin) -->
+  <path d="M 96 376 Q 180 376 220 310 T 384 148" fill="none" stroke="url(#arrowGrad)" stroke-width="26" stroke-linecap="round" filter="url(#glowShadow)" />
+  
+  <!-- Arrow Head -->
+  <path d="M 324 138 L 400 136 L 402 212" fill="none" stroke="#FEF08A" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" filter="url(#glowShadow)" />
+
+  <!-- 5. 3D Golden Indian Rupee Coin (Centerpiece) -->
+  <g filter="url(#coinShadow)">
+    <!-- Outer Gold Rim -->
+    <circle cx="256" cy="266" r="114" fill="#854D0E" />
+    <circle cx="256" cy="260" r="114" fill="url(#goldBevel)" />
+    
+    <!-- Coin Face Inner Dish -->
+    <circle cx="256" cy="260" r="98" fill="url(#goldCoinGrad)" />
+    <circle cx="256" cy="260" r="90" stroke="#FDE047" stroke-width="3" stroke-dasharray="6 4" fill="none" stroke-opacity="0.8" />
+
+    <!-- Rupee '₹' 3D Shadow -->
+    <g transform="translate(2, 4)" stroke="#78350F" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 226 218 L 286 218" />
+      <path d="M 226 242 L 280 242" />
+      <path d="M 248 218 C 274 218, 286 230, 286 246 C 286 264, 268 274, 246 274 L 230 274" fill="none" />
+      <path d="M 242 274 L 286 314" />
+    </g>
+
+    <!-- Rupee '₹' Main Golden White Sculpted Symbol -->
+    <g stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 226 216 L 286 216" />
+      <path d="M 226 240 L 280 240" />
+      <path d="M 248 216 C 274 216, 286 228, 286 244 C 286 262, 268 272, 246 272 L 230 272" fill="none" />
+      <path d="M 242 272 L 286 312" />
+    </g>
+
+    <!-- Subtle Bevel Inner Line -->
+    <g stroke="#FEF08A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+      <path d="M 230 216 L 278 216" />
+      <path d="M 230 240 L 274 240" />
+    </g>
+  </g>
+
+  <!-- 6. Floating Sparkles / Diamond Stars of Prosperity -->
+  <!-- Top Left Sparkle -->
+  <path d="M 128 110 Q 128 130 108 130 Q 128 130 128 150 Q 128 130 148 130 Q 128 130 128 110 Z" fill="#FDE047" opacity="0.9" />
+  <circle cx="128" cy="130" r="3" fill="#FFFFFF" />
+
+  <!-- Bottom Right Mini Sparkle -->
+  <path d="M 404 360 Q 404 374 390 374 Q 404 374 404 388 Q 404 374 418 374 Q 404 374 404 360 Z" fill="#FEF08A" opacity="0.85" />
+
+  <!-- Center Top Tiny Glint -->
+  <circle cx="224" cy="180" r="4" fill="#FFFFFF" opacity="0.8" />
+  <circle cx="340" cy="270" r="5" fill="#34D399" opacity="0.7" />
 </svg>

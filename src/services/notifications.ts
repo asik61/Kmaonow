@@ -2,7 +2,7 @@ export interface InAppNotification {
   id: string;
   title: string;
   message: string;
-  type: 'bonus' | 'withdrawal' | 'task' | 'system';
+  type: 'bonus' | 'withdrawal' | 'task' | 'system' | 'referral';
   timestamp: string;
   read: boolean;
   actionTab?: string;
@@ -11,12 +11,12 @@ export interface InAppNotification {
 export const INITIAL_NOTIFICATIONS: InAppNotification[] = [
   {
     id: 'notif-1',
-    title: '🎉 ₹50 Welcome Bonus Credited!',
-    message: 'Real Money App me judne par ₹50 sign-up bonus aapke wallet me jama kar diya gaya hai.',
+    title: '🎯 Pehla Task Mission: ₹5 Bonus!',
+    message: 'Apna 1st task complete karein aur ₹5.00 Sign-up Welcome bonus seedha wallet me unlock karein.',
     type: 'bonus',
     timestamp: new Date().toISOString(),
     read: false,
-    actionTab: 'withdraw',
+    actionTab: 'tasks',
   },
   {
     id: 'notif-2',
@@ -84,7 +84,7 @@ export async function sendOutPushNotification(
     // If Service Worker is active, send via SW for background reliability
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       const reg = await navigator.serviceWorker.ready;
-      await reg.showNotification(title, {
+      await (reg as any).showNotification(title, {
         body: options.body,
         icon: options.icon || '/pwa-192x192.png',
         badge: options.badge || '/icon.svg',

@@ -107,12 +107,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div
-              style={{ backgroundColor: task.icon_bg || '#059669' }}
-              className="w-12 h-12 rounded-2xl flex items-center justify-center font-extrabold text-sm text-white shadow-md shrink-0"
-            >
-              {task.icon_label}
-            </div>
+            {task.image_url ? (
+              <img
+                src={task.image_url}
+                alt={task.title}
+                className="w-12 h-12 rounded-2xl object-cover shadow-md shrink-0 border border-slate-200 bg-white"
+              />
+            ) : (
+              <div
+                style={{ backgroundColor: task.icon_bg || '#059669' }}
+                className="w-12 h-12 rounded-2xl flex items-center justify-center font-extrabold text-sm text-white shadow-md shrink-0 border border-white/30"
+              >
+                {task.icon_label}
+              </div>
+            )}
             <div>
               <div className="text-xs text-emerald-700 font-bold uppercase tracking-wider">{task.subtitle}</div>
               <h2 className="text-lg font-black text-slate-900 leading-tight">{task.title}</h2>

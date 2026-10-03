@@ -9,7 +9,8 @@ import {
   Zap,
   Smartphone,
   ShieldCheck,
-  Check
+  Check,
+  Users
 } from 'lucide-react';
 import type { InAppNotification } from '../services/notifications';
 import { requestPushPermission, sendOutPushNotification } from '../services/notifications';
@@ -180,6 +181,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
                     {notif.type === 'bonus' && <Gift className="w-4 h-4 text-amber-600" />}
+                    {notif.type === 'referral' && <Users className="w-4 h-4 text-emerald-600" />}
                     {notif.type === 'withdrawal' && <Zap className="w-4 h-4 text-emerald-600" />}
                     {notif.type === 'task' && <Sparkles className="w-4 h-4 text-teal-600" />}
                     {notif.type === 'system' && <Bell className="w-4 h-4 text-slate-600" />}

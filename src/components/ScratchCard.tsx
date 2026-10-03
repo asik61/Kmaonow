@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Sparkles, Clock, CheckCircle2 } from 'lucide-react';
 
 interface ScratchCardProps {
+  dailyClaimed: boolean;
   onRewardWon: (amount: number) => void;
 }
 
@@ -17,24 +19,51 @@ const PRIZES = [
 
 const SPARKLES = ['✦★✦', '⭐✨⭐', '💫⭐💫', '✨💰✨', '🌟✦🌟'];
 
-export const ScratchCard: React.FC<ScratchCardProps> = ({ onRewardWon }) => {
+export const ScratchCard: React.FC<ScratchCardProps> = ({ dailyClaimed, onRewardWon }) => {
   const [currentPrize, setCurrentPrize] = useState(PRIZES[6]);
   const [sparkle, setSparkle] = useState('✦★✦');
   const [serial, setSerial] = useState('TC-784920');
-  const [scratchedPct, setScratchedPct] = useState(0);
-  const [isRevealed, setIsRevealed] = useState(false);
-  const [hasClaimed, setHasClaimed] = useState(false);
+  const [scratchedPct, setScratchedPct] = useState(dailyClaimed ? 100 : 0);
+  const [isRevealed, setIsRevealed] = useState(dailyClaimed);
+  const [hasClaimed, setHasClaimed] = useState(dailyClaimed);
+  const [midnightTimer, setMidnightTimer] = useState<string>('');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDownRef = useRef(false);
-  const isRevealedRef = useRef(false);
+  const isRevealedRef = useRef(dailyClaimed);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Live Countdown to Midnight
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const midnight = new Date();
+      midnight.setHours(24, 0, 0, 0);
+      const diff = midnight.getTime() - now.getTime();
+      if (diff <= 0) {
+        setMidnightTimer('00:00:00');
+        return;
+      }
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      setMidnightTimer(
+        `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      );
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Web Audio Context helper
   const getAudioContext = useCallback(() => {
     if (!audioCtxRef.current) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
         audioCtxRef.current = new AudioCtx();
       }
@@ -129,41 +158,51 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ onRewardWon }) => {
     ctx.fillStyle = sh;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = 'rgba(60,60,70,0.6)';
-    ctx.font = 'bold 14px sans-serif';
+    ctx.fillStyle = 'rgba(60,60,70,0.65)';
+    ctx.font = 'bold 14px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('✦  SCRATCH HERE  ✦', W / 2, H / 2 - 12);
-    ctx.font = '11px sans-serif';
-    ctx.fillStyle = 'rgba(50,50,60,0.45)';
-    ctx.fillText('Yahan scratch karo aur jeeto', W / 2, H / 2 + 12);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(50,50,60,0.5)';
+    ctx.fillText('Ungli se scratch karein aur jeetein', W / 2, H / 2 + 12);
   }, []);
 
-  const setupNewCard = useCallback(() => {
-    isRevealedRef.current = false;
-    setIsRevealed(false);
-    setHasClaimed(false);
-    setScratchedPct(0);
-    lastPosRef.current = null;
-    isDownRef.current = false;
-
-    const chosenPrize = PRIZES[Math.floor(Math.random() * PRIZES.length)];
-    setCurrentPrize(chosenPrize);
-    setSparkle(SPARKLES[Math.floor(Math.random() * SPARKLES.length)]);
-    setSerial('TC-' + Math.floor(100000 + Math.random() * 900000));
-
-    setTimeout(() => {
-      initScratchSurface();
-    }, 20);
-  }, [initScratchSurface]);
-
   useEffect(() => {
-    setupNewCard();
-  }, [setupNewCard]);
+    if (dailyClaimed) {
+      isRevealedRef.current = true;
+      setIsRevealed(true);
+      setHasClaimed(true);
+      setScratchedPct(100);
+      const cv = canvasRef.current;
+      if (cv) {
+        const ctx = cv.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, cv.width, cv.height);
+        }
+      }
+    } else {
+      isRevealedRef.current = false;
+      setIsRevealed(false);
+      setHasClaimed(false);
+      setScratchedPct(0);
+      lastPosRef.current = null;
+      isDownRef.current = false;
+
+      const chosenPrize = PRIZES[Math.floor(Math.random() * PRIZES.length)];
+      setCurrentPrize(chosenPrize);
+      setSparkle(SPARKLES[Math.floor(Math.random() * SPARKLES.length)]);
+      setSerial('TC-' + Math.floor(100000 + Math.random() * 900000));
+
+      setTimeout(() => {
+        initScratchSurface();
+      }, 50);
+    }
+  }, [dailyClaimed, initScratchSurface]);
 
   // Touch and mouse scratch handlers
   const handleStart = (clientX: number, clientY: number) => {
-    if (isRevealedRef.current) return;
+    if (isRevealedRef.current || dailyClaimed) return;
     isDownRef.current = true;
     const cv = canvasRef.current;
     if (!cv) return;
@@ -173,7 +212,7 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ onRewardWon }) => {
   };
 
   const handleMove = (clientX: number, clientY: number) => {
-    if (!isDownRef.current || isRevealedRef.current) return;
+    if (!isDownRef.current || isRevealedRef.current || dailyClaimed) return;
     const cv = canvasRef.current;
     if (!cv) return;
     const ctx = cv.getContext('2d');
@@ -183,57 +222,50 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ onRewardWon }) => {
     const y = clientY - r.top;
 
     ctx.globalCompositeOperation = 'destination-out';
-    const PI2 = Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 22, 0, Math.PI * 2);
+    ctx.fill();
 
     if (lastPosRef.current) {
-      const dist = Math.hypot(x - lastPosRef.current.x, y - lastPosRef.current.y);
-      const steps = Math.max(1, Math.floor(dist / 3));
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const ix = lastPosRef.current.x + (x - lastPosRef.current.x) * t;
-        const iy = lastPosRef.current.y + (y - lastPosRef.current.y) * t;
-        ctx.beginPath();
-        ctx.ellipse(ix, iy, 22, 10, Math.atan2(y - lastPosRef.current.y, x - lastPosRef.current.x), 0, PI2);
-        ctx.fill();
-
-        for (let b = 0; b < 3; b++) {
-          ctx.beginPath();
-          ctx.arc(ix + (Math.random() - 0.5) * 28, iy + (Math.random() - 0.5) * 14, 2 + Math.random() * 3, 0, PI2);
-          ctx.fill();
-        }
-      }
-    } else {
       ctx.beginPath();
-      ctx.ellipse(x, y, 22, 10, 0, 0, PI2);
-      ctx.fill();
+      ctx.lineWidth = 44;
+      ctx.lineCap = 'round';
+      ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
+      ctx.lineTo(x, y);
+      ctx.stroke();
     }
-
     lastPosRef.current = { x, y };
+
     playScratchSound();
 
-    // Check progress
-    const W = cv.width;
-    const H = cv.height;
-    const d = ctx.getImageData(0, 0, W, H).data;
-    let c = 0;
-    for (let i = 3; i < d.length; i += 4) {
-      if (d[i] < 64) c++;
-    }
-    const pct = Math.min(Math.round((c / (W * H)) * 100), 100);
-    setScratchedPct(pct);
+    // Check scratch progress
+    try {
+      const W = cv.width;
+      const H = cv.height;
+      const step = 8;
+      const imgData = ctx.getImageData(0, 0, W, H);
+      const data = imgData.data;
+      let clearCount = 0;
+      let totalCount = 0;
 
-    if (pct >= 55 && !isRevealedRef.current) {
-      isRevealedRef.current = true;
-      setIsRevealed(true);
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillRect(0, 0, W, H);
-      setScratchedPct(100);
-      playWinJingle();
-
-      if (!hasClaimed) {
-        setHasClaimed(true);
-        onRewardWon(currentPrize.value);
+      for (let py = 0; py < H; py += step) {
+        for (let px = 0; px < W; px += step) {
+          totalCount++;
+          const idx = (py * W + px) * 4 + 3;
+          if (data[idx] < 128) {
+            clearCount++;
+          }
+        }
       }
+
+      const pct = Math.min(100, Math.round((clearCount / totalCount) * 100));
+      setScratchedPct(pct);
+
+      if (pct >= 45 && !isRevealedRef.current) {
+        revealCard(ctx, W, H);
+      }
+    } catch {
+      // Fallback
     }
   };
 
@@ -242,129 +274,101 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ onRewardWon }) => {
     lastPosRef.current = null;
   };
 
+  const revealCard = (ctx: CanvasRenderingContext2D, W: number, H: number) => {
+    isRevealedRef.current = true;
+    setIsRevealed(true);
+    setScratchedPct(100);
+
+    ctx.clearRect(0, 0, W, H);
+    playWinJingle();
+
+    if (!hasClaimed && !dailyClaimed) {
+      setHasClaimed(true);
+      onRewardWon(currentPrize.value);
+    }
+  };
+
   return (
     <div className="w-full flex justify-center py-2 animate-fade-in select-none">
       <style>{`
-        @keyframes floatParticle {
-          0% { transform: translateY(100%) scale(0); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 0.5; }
-          100% { transform: translateY(-130%) scale(1.1); opacity: 0; }
-        }
-        @keyframes glowAnim {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        @keyframes headerShift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        @keyframes sparklePulse {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.15); }
-        }
-        @keyframes prizeGlow {
-          0%, 100% { text-shadow: 0 0 20px rgba(255,215,0,0.6); }
-          50% { text-shadow: 0 0 50px rgba(255,215,0,1), 0 0 90px rgba(255,140,0,0.7); }
-        }
-        @keyframes handMotion {
-          0%, 100% { transform: translateX(-5px) rotate(-10deg); }
-          50% { transform: translateX(5px) rotate(10deg); }
-        }
-        @keyframes winPop {
-          0% { transform: scale(0.7); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
         @keyframes borderRainbow {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
+        @keyframes handMotion {
+          0%, 100% { transform: translateX(-6px); }
+          50% { transform: translateX(6px); }
+        }
+        @keyframes winPop {
+          0% { transform: scale(0.85); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
       `}</style>
 
-      {/* Main Page Wrap */}
-      <div className="relative w-full max-w-[400px] rounded-3xl p-5 text-center overflow-hidden bg-gradient-to-b from-[#0a0a1a] via-[#0d1a0d] to-[#0a0a1a] border border-amber-500/20 shadow-2xl">
-        {/* Floating Particles */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {[...Array(16)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute rounded-full"
-              style={{
-                width: `${3 + (i % 4) * 2}px`,
-                height: `${3 + (i % 4) * 2}px`,
-                left: `${(i * 6.5) % 100}%`,
-                bottom: '-10px',
-                backgroundColor: i % 2 === 0 ? 'rgba(255,215,0,0.35)' : 'rgba(255,140,0,0.25)',
-                animation: `floatParticle ${5 + (i % 5)}s linear infinite`,
-                animationDelay: `${(i * 0.4) % 4}s`,
-              }}
-            />
-          ))}
-        </div>
-
+      {/* Main Container */}
+      <div className="relative w-full max-w-[400px] rounded-3xl p-5 text-center overflow-hidden bg-gradient-to-b from-[#0a3d2b] to-[#051f17] border border-amber-400/25 shadow-2xl">
         {/* Top Badge */}
-        <div className="relative z-10 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-300 text-xs font-bold mb-4 tracking-wide shadow-xs">
-          <span>⚡ Scratch &amp; Win Instant Cash</span>
+        <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-300 text-xs font-bold mb-3 tracking-wide shadow-xs">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span>Daily 1 Free Scratch Card Only • Instant Cash</span>
         </div>
 
-        {/* Card Wrap with Animated Glowing Border */}
-        <div className="relative z-10 w-[290px] mx-auto">
-          <div
-            className="absolute -inset-2 rounded-[26px] opacity-40 blur-md pointer-events-none"
-            style={{
-              background: 'linear-gradient(135deg,#FFD700,#ff6b00,#FFD700)',
-              backgroundSize: '300% 300%',
-              animation: 'glowAnim 3s ease infinite',
-            }}
-          />
+        {/* Header Title */}
+        <div className="mb-4">
+          <h2 className="text-xl font-black text-white tracking-wide">
+            Lucky Scratch &amp; Win!
+          </h2>
+          <p className="text-white/60 text-xs mt-0.5 font-medium">
+            Rozana 1 free golden scratch card milta hai
+          </p>
+        </div>
 
-          {/* Actual Scratch Card Body */}
-          <div className="relative z-10 rounded-2xl bg-gradient-to-br from-[#1a0a2e] via-[#0d0520] to-[#1a0a2e] border-2 border-amber-400/35 overflow-hidden shadow-2xl">
-            {/* Header */}
-            <div
-              className="px-4 py-3 flex items-center justify-between"
-              style={{
-                background: 'linear-gradient(135deg,#FFD700,#ff8c00,#FFD700)',
-                backgroundSize: '200% 200%',
-                animation: 'headerShift 3s ease infinite',
-              }}
-            >
-              <div className="text-lg font-black text-[#1a0500] tracking-widest uppercase">
-                TASKPAY
-              </div>
-              <div className="bg-black/25 rounded-full px-2.5 py-1 text-[10px] font-black text-white tracking-wider">
-                FREE CARD
-              </div>
-            </div>
+        {/* Scratch Card Outer Envelope */}
+        <div
+          className="relative w-full max-w-[320px] mx-auto rounded-3xl p-[3px] shadow-[0_10px_30px_rgba(0,0,0,0.6)]"
+          style={{
+            background: 'linear-gradient(135deg,#FFE066,#FFB800,#FF8C00,#FFE066)',
+            backgroundSize: '300% 300%',
+            animation: 'borderRainbow 4s linear infinite',
+          }}
+        >
+          <div className="rounded-[22px] bg-gradient-to-b from-[#113829] to-[#0a2319] p-4 text-center border border-amber-300/30">
+            {/* Card Frame */}
+            <div className="relative rounded-2xl bg-gradient-to-b from-[#072518] to-[#03150e] border-2 border-amber-400/40 p-3 overflow-hidden shadow-inner">
+              {/* Corner Ornaments */}
+              <div className="absolute top-1 left-1.5 text-amber-400/40 text-[10px] font-mono">✦</div>
+              <div className="absolute top-1 right-1.5 text-amber-400/40 text-[10px] font-mono">✦</div>
+              <div className="absolute bottom-1 left-1.5 text-amber-400/40 text-[10px] font-mono">✦</div>
+              <div className="absolute bottom-1 right-1.5 text-amber-400/40 text-[10px] font-mono">✦</div>
 
-            {/* Card Body */}
-            <div className="p-3.5">
-              {/* Scratch Canvas Zone */}
-              <div className="relative w-full h-[175px] rounded-xl overflow-hidden cursor-crosshair border border-amber-400/20 shadow-inner">
-                {/* Prize Hidden Below */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#1a0a3e,#0a0515)] flex flex-col items-center justify-center gap-0.5">
-                  <div
-                    className="text-lg tracking-[6px]"
-                    style={{ animation: 'sparklePulse 1.5s ease-in-out infinite' }}
-                  >
-                    {sparkle}
+              {/* Card Title Header */}
+              <div className="flex items-center justify-between text-[11px] font-black text-amber-300 tracking-wider mb-2 uppercase px-1">
+                <span>Real Money Card</span>
+                <span className="text-[10px] text-emerald-400 font-mono">100% Free</span>
+              </div>
+
+              {/* Scratch Area Wrapper */}
+              <div className="relative w-full h-[175px] rounded-xl overflow-hidden shadow-inner bg-gradient-to-b from-[#04160d] to-[#010905] border border-amber-400/30">
+                {/* Prize Underneath Layer */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-3 select-none">
+                  <div className="text-amber-300 text-xs font-bold tracking-widest uppercase mb-1 opacity-80">
+                    {sparkle} You Won {sparkle}
                   </div>
-                  <div
-                    className="text-amber-400 text-5xl font-black leading-none my-1"
-                    style={{ animation: 'prizeGlow 2s ease-in-out infinite' }}
-                  >
+                  <div className="font-black text-4xl sm:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-[#FFF59D] via-[#FFD700] to-[#FF8F00] drop-shadow-[0_2px_10px_rgba(255,215,0,0.5)]">
                     {currentPrize.label}
                   </div>
-                  <div className="text-[11px] text-amber-300/70 tracking-[3px] font-bold mt-1">
-                    AAPNE JEETA
+                  <div className="text-[11px] text-emerald-300 font-bold mt-1.5 bg-emerald-950/70 px-3 py-0.5 rounded-full border border-emerald-400/30">
+                    ✓ Wallet Mein Add Ho Gaya
                   </div>
                 </div>
 
-                {/* Canvas Overlay */}
+                {/* HTML5 Scratch Surface Canvas */}
                 <canvas
                   ref={canvasRef}
-                  className="absolute inset-0 rounded-xl touch-none"
+                  className={`absolute inset-0 w-full h-full cursor-pointer z-10 touch-none ${
+                    dailyClaimed ? 'hidden pointer-events-none' : ''
+                  }`}
                   onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
                   onMouseMove={(e) => handleMove(e.clientX, e.clientY)}
                   onMouseUp={handleEnd}
@@ -374,7 +378,6 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ onRewardWon }) => {
                     handleStart(t.clientX, t.clientY);
                   }}
                   onTouchMove={(e) => {
-                    e.preventDefault();
                     const t = e.touches[0];
                     handleMove(t.clientX, t.clientY);
                   }}
@@ -382,13 +385,13 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ onRewardWon }) => {
                 />
               </div>
 
-              {/* Hint Row */}
-              {!isRevealed && (
-                <div className="mt-2.5 flex items-center justify-center gap-2 text-white/40 text-[11px] font-medium transition-opacity">
+              {/* Scratch Hint */}
+              {!dailyClaimed && !isRevealed && (
+                <div className="mt-2.5 flex items-center justify-center gap-2 text-white/50 text-[11px] font-medium">
                   <span style={{ animation: 'handMotion 1s ease-in-out infinite' }} className="text-lg">
                     ✌️
                   </span>
-                  <span>Yahan scratch karo</span>
+                  <span>Ungli se pura scratch karo</span>
                   <span style={{ animation: 'handMotion 1s ease-in-out infinite' }} className="text-lg">
                     ✌️
                   </span>
@@ -396,65 +399,65 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ onRewardWon }) => {
               )}
 
               {/* Progress Bar Row */}
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#FFD700] to-[#ff6b00] rounded-full transition-all duration-75"
-                    style={{ width: `${scratchedPct}%` }}
-                  />
-                </div>
-                <div className="text-[10px] text-amber-300/60 font-bold min-w-[28px] text-right">
-                  {scratchedPct}%
-                </div>
-              </div>
-
-              {/* Win Notification Box */}
-              {isRevealed && (
-                <div
-                  className="mt-3 rounded-xl p-3 bg-gradient-to-r from-amber-400/15 to-orange-500/10 border border-amber-400/40 text-center"
-                  style={{ animation: 'winPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
-                >
-                  <div className="text-amber-400 font-black text-xl">
-                    🎉 {currentPrize.label} jeeta!
+              {!dailyClaimed && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#FFD700] to-[#ff6b00] rounded-full transition-all duration-75"
+                      style={{ width: `${scratchedPct}%` }}
+                    />
                   </div>
-                  <div className="text-white/50 text-[11px] mt-0.5">
-                    Amount wallet mein add ho gaya hai
+                  <div className="text-[10px] text-amber-300/70 font-bold min-w-[28px] text-right">
+                    {scratchedPct}%
                   </div>
                 </div>
               )}
 
               {/* Card Footer */}
-              <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-white/10 text-[9px] text-white/20 font-mono tracking-wider">
+              <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10 text-[9px] text-white/30 font-mono tracking-wider">
                 <span>{serial}</span>
-                <span>VALID 24 HRS</span>
+                <span>DAILY RESET: MIDNIGHT</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Naya Card Lo Action Button */}
-        <div
-          className="relative z-10 w-[290px] mx-auto mt-4 rounded-2xl p-[3px] shadow-[0_0_20px_rgba(255,165,0,0.4)]"
-          style={{
-            background: 'linear-gradient(135deg,#FFD700,#ff6b00,#ff0080,#FFD700)',
-            backgroundSize: '300% 300%',
-            animation: 'borderRainbow 2.5s linear infinite',
-          }}
-        >
-          <button
-            type="button"
-            onClick={setupNewCard}
-            className="w-full py-3.5 rounded-[13px] bg-gradient-to-b from-[#e65c00] via-[#b83200] to-[#8a1f00] hover:from-[#ff6600] hover:to-[#992200] text-white font-black text-base tracking-wide transition-transform active:scale-[0.97] cursor-pointer shadow-lg"
+        {/* Action Status / Daily Claimed Status */}
+        {dailyClaimed || hasClaimed ? (
+          <div className="relative z-10 w-[290px] mx-auto mt-4 p-4 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-center shadow-lg space-y-1.5">
+            <div className="flex items-center justify-center gap-1.5 text-amber-300 font-black text-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>✓ Aaj Ka Free Scratch Card Claimed (1/1)</span>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-white/70 font-medium">
+              <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>
+                Agla Scratch Card:{' '}
+                <span className="font-mono font-bold text-amber-300">
+                  {midnightTimer || 'Midnight'}
+                </span>{' '}
+                mein unlock hoga
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="relative z-10 w-[290px] mx-auto mt-4 rounded-2xl p-[3px] shadow-[0_0_20px_rgba(255,165,0,0.4)]"
+            style={{
+              background: 'linear-gradient(135deg,#FFD700,#ff6b00,#ff0080,#FFD700)',
+              backgroundSize: '300% 300%',
+              animation: 'borderRainbow 2.5s linear infinite',
+            }}
           >
-            🎁 Naya Card Lo
-          </button>
-        </div>
+            <div className="w-full py-3 rounded-[13px] bg-gradient-to-b from-[#e65c00] via-[#b83200] to-[#8a1f00] text-white font-black text-sm tracking-wide text-center shadow-lg">
+              ✨ Scratch The Card Above
+            </div>
+          </div>
+        )}
 
         {/* Tagline */}
-        <p className="relative z-10 text-white/25 text-[11px] mt-3 leading-relaxed">
-          Roz ek free scratch card milti hai
-          <br />
-          Turant cash jito apne wallet mein
+        <p className="relative z-10 text-white/40 text-[11px] mt-3 leading-relaxed">
+          Daily Strictly 1 Free Scratch Card Only • Instant UPI Cash
         </p>
       </div>
     </div>

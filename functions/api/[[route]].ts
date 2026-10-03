@@ -41,6 +41,15 @@ interface R2Bucket {
   delete: (key: string) => Promise<any>;
 }
 
+type PagesFunction<T = any> = (context: {
+  request: Request;
+  env: T;
+  params?: Record<string, string | string[]>;
+  data?: Record<string, unknown>;
+  next?: () => Promise<Response>;
+  waitUntil?: (promise: Promise<unknown>) => void;
+}) => Promise<Response> | Response;
+
 // Universal response helper with CORS
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), {

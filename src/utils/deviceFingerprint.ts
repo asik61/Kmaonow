@@ -1,7 +1,7 @@
 /**
  * Real Money App - Device Fingerprinting & Anti-Fraud Utility
- * Enforces "1 Phone = 1 Account" policy to prevent multi-accounting,
- * self-referral looting, and bonus abuse.
+ * Enforces strict "1 Phone = 1 Account" and "1 Device = 1 Account" policy to prevent multi-accounting,
+ * self-referral abuse, and fake bonus claims.
  */
 
 const DEVICE_KEY = 'realmoney_device_signature_v1';
@@ -23,7 +23,6 @@ export function getOrCreateDeviceId(): string {
   try {
     let existingId = localStorage.getItem(DEVICE_KEY);
     if (!existingId) {
-      // Create a deterministic pseudo-hardware hash from browser & display parameters
       const screenSignature = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
       const navSignature = `${navigator.language}_${navigator.hardwareConcurrency || 4}_${navigator.platform || ''}`;
       const randomSeed = Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -62,8 +61,10 @@ export function getDeviceInfo(): DeviceInfo {
 }
 
 /**
- * Checks if this device already has an account registered.
- * Returns { allowed: boolean, existingPhone?: string, reason?: string }
+ * Validates that:
+ * 1. The phone number is not already bound to a DIFFERENT email address.
+ * 2. The email address is not already bound to a DIFFERENT phone number.
+ * 3. A single device cannot be used to spawn multiple separate accounts.
  */
 export function validateNewAccountOnDevice(newPhone: string, newEmail?: string): {
   allowed: boolean;
@@ -71,31 +72,94 @@ export function validateNewAccountOnDevice(newPhone: string, newEmail?: string):
   reason?: string;
 } {
   try {
-    const raw = localStorage.getItem(REGISTERED_ACCOUNTS_KEY);
-    const registered: Array<{ phone: string; email?: string; registeredAt: string; name: string }> = raw
-      ? JSON.parse(raw)
+    const cleanNewPhone = newPhone.replace(/\D/g, '');
+    const normalizedNewEmail = newEmail ? newEmail.trim().toLowerCase() : '';
+
+    // 1. Check globally saved users in kamaonow_all_users
+    const rawAllUsers = localStorage.getItem('kamaonow_all_users');
+    if (rawAllUsers) {
+      const allUsersList = JSON.parse(rawAllUsers);
+      if (Array.isArray(allUsersList)) {
+        for (const u of allUsersList) {
+          const userPhone = (u.phone || '').replace(/\D/g, '');
+          const userEmail = (u.email || '').trim().toLowerCase();
+
+          // Phone collision check: If same phone is registered with a different email
+          if (cleanNewPhone && userPhone === cleanNewPhone) {
+            if (normalizedNewEmail && userEmail && normalizedNewEmail !== userEmail) {
+              return {
+                allowed: false,
+                reason: `❌ Yeh mobile number (+91 ******${cleanNewPhone.slice(-4)}) pehle se doosre account (${userEmail}) se linked hai. Ek mobile number sirf ek account me use ho sakta hai.`,
+              };
+            }
+          }
+
+          // Email collision check: If same email is registered with a different phone
+          if (normalizedNewEmail && userEmail === normalizedNewEmail) {
+            if (cleanNewPhone && userPhone && userPhone !== cleanNewPhone) {
+              return {
+                allowed: false,
+                reason: `❌ Yeh Google account pehle se doosre mobile number (+91 ******${userPhone.slice(-4)}) se linked hai.`,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Check device-registered accounts
+    const rawDevice = localStorage.getItem(REGISTERED_ACCOUNTS_KEY);
+    const registered: Array<{ phone: string; email?: string; registeredAt: string; name: string }> = rawDevice
+      ? JSON.parse(rawDevice)
       : [];
 
-    const cleanNewPhone = newPhone.replace(/\D/g, '');
+    for (const acc of registered) {
+      const accPhone = (acc.phone || '').replace(/\D/g, '');
+      const accEmail = (acc.email || '').trim().toLowerCase();
 
-    // Check if the current phone is already the registered one (allowing re-login)
-    const exactMatch = registered.find(
-      (acc) => acc.phone.replace(/\D/g, '') === cleanNewPhone || (newEmail && acc.email === newEmail)
-    );
+      // Check if phone matches but email differs
+      if (cleanNewPhone && accPhone === cleanNewPhone) {
+        if (normalizedNewEmail && accEmail && normalizedNewEmail !== accEmail) {
+          return {
+            allowed: false,
+            reason: `❌ Yeh mobile number pehle se doosre account (${accEmail}) se linked hai. Ek mobile number sirf ek account me use ho sakta hai.`,
+          };
+        }
+      }
 
-    if (exactMatch) {
-      // Logging in back into their own account is completely fine!
+      // Check if email matches but phone differs
+      if (normalizedNewEmail && accEmail === normalizedNewEmail) {
+        if (cleanNewPhone && accPhone && accPhone !== cleanNewPhone) {
+          return {
+            allowed: false,
+            reason: `❌ Yeh Google account pehle se doosre mobile number (+91 ******${accPhone.slice(-4)}) se linked hai.`,
+          };
+        }
+      }
+    }
+
+    // 3. Check if exact same account is logging back in on this device
+    const isSameAccount = registered.some((acc) => {
+      const accPhone = (acc.phone || '').replace(/\D/g, '');
+      const accEmail = (acc.email || '').trim().toLowerCase();
+      if (normalizedNewEmail && accEmail) {
+        return accEmail === normalizedNewEmail && (!cleanNewPhone || accPhone === cleanNewPhone);
+      }
+      return accPhone === cleanNewPhone;
+    });
+
+    if (isSameAccount) {
       return { allowed: true };
     }
 
-    // If another account is already bound to this physical phone
+    // 4. Device multi-account restriction
     if (registered.length >= 1) {
       const primary = registered[0];
       const maskedPhone = primary.phone ? `+91 ******${primary.phone.slice(-4)}` : 'purana account';
       return {
         allowed: false,
         existingPhone: maskedPhone,
-        reason: `1 Phone = 1 Account Niyam: Is mobile phone par pehle se ek account (${maskedPhone}) registered hai. Naya account banakar sign-up bonus baar-baar lena mana hai. Kripya apna pehla account login karein.`,
+        reason: `❌ Is phone par pehle se ek account (${maskedPhone}) registered hai. 1 Phone = 1 Account niyam ke tehat doosra naya account banana mana hai.`,
       };
     }
 
@@ -106,7 +170,7 @@ export function validateNewAccountOnDevice(newPhone: string, newEmail?: string):
 }
 
 /**
- * Binds a newly created account to this physical device
+ * Binds an account to this physical device hardware
  */
 export function registerAccountOnDevice(account: { phone: string; email?: string; name: string }) {
   try {
@@ -116,17 +180,29 @@ export function registerAccountOnDevice(account: { phone: string; email?: string
       : [];
 
     const cleanPhone = account.phone.replace(/\D/g, '');
-    const exists = registered.some((acc) => acc.phone.replace(/\D/g, '') === cleanPhone);
+    const cleanEmail = account.email ? account.email.trim().toLowerCase() : undefined;
 
-    if (!exists) {
+    const existingIndex = registered.findIndex(
+      (acc) => acc.phone.replace(/\D/g, '') === cleanPhone || (cleanEmail && acc.email?.toLowerCase() === cleanEmail)
+    );
+
+    if (existingIndex >= 0) {
+      registered[existingIndex] = {
+        ...registered[existingIndex],
+        phone: cleanPhone,
+        email: cleanEmail || registered[existingIndex].email,
+        name: account.name || registered[existingIndex].name,
+      };
+    } else {
       registered.push({
         phone: cleanPhone,
-        email: account.email,
+        email: cleanEmail,
         name: account.name,
         registeredAt: new Date().toISOString(),
       });
-      localStorage.setItem(REGISTERED_ACCOUNTS_KEY, JSON.stringify(registered));
     }
+
+    localStorage.setItem(REGISTERED_ACCOUNTS_KEY, JSON.stringify(registered));
   } catch {
     // ignore
   }
@@ -141,7 +217,6 @@ export function isSelfReferralOnDevice(enteredReferralCode: string, userOwnRefer
   if (userOwnReferralCode && cleanCode === userOwnReferralCode.trim().toUpperCase()) {
     return true;
   }
-  // Check if saved user referral code on this device matches
   try {
     const savedUser = localStorage.getItem('kamaonow_user');
     if (savedUser) {

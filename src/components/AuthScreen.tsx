@@ -186,7 +186,7 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
 
     const deviceCheck = validateNewAccountOnDevice(cleanPhone, googleUser?.email);
     if (!deviceCheck.allowed) {
-      setError(deviceCheck.reason || '1 Phone = 1 Account: Is device par pehle se ek account linked hai.');
+      setError(deviceCheck.reason || '❌ Is mobile number/device par pehle se ek account registered hai.');
       return;
     }
 
@@ -199,39 +199,33 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       setOtp(''); // Strict requirement: do NOT autofill! Let user enter it
       setStage('otp-verify');
       setResendTimer(30);
-      setOtpNotification(null); // Hide initially so it arrives after 3 to 5 seconds
-      setIsOtpDelivering(true);
-
-      // Realistic SMS Delivery Delay (3.5 to 4.5 seconds as requested by user)
-      setTimeout(() => {
-        setIsOtpDelivering(false);
-        setOtpNotification({ show: true, code });
-        playNotificationChime();
-      }, 3800);
-    }, 400);
+      setIsOtpDelivering(false);
+      setOtpNotification({ show: true, code });
+      playNotificationChime();
+    }, 450);
   };
 
   const handleResendOtp = () => {
-    if (resendTimer > 0 || isOtpDelivering) return;
+    if (resendTimer > 0) return;
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setGeneratedOtp(code);
     setOtp('');
     setResendTimer(30);
-    setOtpNotification(null);
-    setIsOtpDelivering(true);
-
-    // Realistic SMS delivery delay
-    setTimeout(() => {
-      setIsOtpDelivering(false);
-      setOtpNotification({ show: true, code });
-      playNotificationChime();
-    }, 3800);
+    setOtpNotification({ show: true, code });
+    playNotificationChime();
   };
 
   // 4. Verify OTP and finalize registration
   const handleVerifyOtp = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    const deviceCheck = validateNewAccountOnDevice(cleanPhone, googleUser?.email);
+    if (!deviceCheck.allowed) {
+      setError(deviceCheck.reason || '❌ Yeh mobile number pehle se kisi doosre account se linked hai.');
+      return;
+    }
 
     if (otp.length < 4) {
       setError('Kripya notification me aaya hua 4-digit OTP enter karein.');
@@ -247,7 +241,6 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      const cleanPhone = phone.replace(/\D/g, '');
       const userCode = `RM${cleanPhone.slice(-4)}${Math.floor(100 + Math.random() * 900)}`;
       const userEmail = googleUser ? googleUser.email.trim().toLowerCase() : `${cleanPhone}@realmoneyapp.online`;
       const isMasterAdmin = userEmail === 'asik94906@gmail.com';
@@ -279,7 +272,7 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       // Sync to real Firestore database
       syncUserProfile(finalUser).catch(console.error);
       setStage('success-bonus');
-    }, 700);
+    }, 500);
   };
 
   // Quick Demo Bypass
@@ -777,30 +770,12 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
               </p>
             </div>
 
-            {/* Delivery Progress Bar / Realistic Status */}
-            {isOtpDelivering ? (
-              <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-amber-900 animate-pulse space-y-2">
-                <div className="flex items-center justify-between text-xs font-black">
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                    SMS Gateway se OTP aa raha hai...
-                  </span>
-                  <span className="text-[10px] font-bold text-amber-700">3-5s wait</span>
-                </div>
-                <div className="w-full bg-amber-200 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-amber-600 h-full rounded-full animate-[progress_3.8s_ease-out_forwards] w-full" />
-                </div>
-                <p className="text-[11px] text-amber-800 font-medium">
-                  3-4 second me screen ke upar <strong>SMS notification</strong> pop-up aayega.
-                </p>
+            {/* SMS Notification Banner */}
+            {otpNotification?.show && (
+              <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center gap-2">
+                <Bell className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>SMS Notification Aa Gaya! Screen ke upar 4-digit code check karein.</span>
               </div>
-            ) : (
-              otpNotification?.show && (
-                <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-emerald-600 animate-bounce shrink-0" />
-                  <span>SMS Aa Gaya! Screen ke upar se 4-digit code enter karein.</span>
-                </div>
-              )
             )}
 
             {error && (

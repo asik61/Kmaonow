@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Smartphone,
   Gift,
@@ -13,7 +13,10 @@ import {
   UserCheck,
   ChevronRight,
   CreditCard,
-  Users
+  Users,
+  Bell,
+  Check,
+  Copy
 } from 'lucide-react';
 import type { UserProfile } from '../types/kamaonow';
 import { KamaoNowLogo3D, HeroPhone3DIllustration } from './Illustrations3D';
@@ -52,9 +55,46 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   const [name, setName] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [otp, setOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [otpNotification, setOtpNotification] = useState<{ show: boolean; code: string } | null>(null);
+  const [resendTimer, setResendTimer] = useState(30);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<{ user: UserProfile; isNew: boolean } | null>(null);
+
+  // Play realistic mobile notification chime
+  const playNotificationChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(587.33, now); // D5
+      gain1.gain.setValueAtTime(0.18, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.3);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880, now + 0.1); // A5
+      gain2.gain.setValueAtTime(0.22, now + 0.1);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.1);
+      osc2.stop(now + 0.5);
+    } catch {
+      // Audio context silently ignored if autoplay policy restricts
+    }
+  };
 
   // Suggested Google Accounts (including the user's logged in account for seamless 1-tap UX)
   const defaultGoogleAccounts: GoogleAccount[] = [
@@ -152,9 +192,25 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+      // Generate random 4-digit code (e.g. 5824, 7391)
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      setGeneratedOtp(code);
+      setOtp(''); // Strict requirement: do NOT autofill! Let user enter it
       setStage('otp-verify');
-      setOtp('1234'); // Instant test OTP
-    }, 500);
+      setResendTimer(30);
+      setOtpNotification({ show: true, code });
+      playNotificationChime();
+    }, 600);
+  };
+
+  const handleResendOtp = () => {
+    if (resendTimer > 0) return;
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setGeneratedOtp(code);
+    setOtp('');
+    setResendTimer(30);
+    setOtpNotification({ show: true, code });
+    playNotificationChime();
   };
 
   // 4. Verify OTP and finalize registration
@@ -163,7 +219,13 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     setError('');
 
     if (otp.length < 4) {
-      setError('Kripya 4-digit OTP daalein (Test OTP: 1234)');
+      setError('Kripya notification me aaya hua 4-digit OTP enter karein.');
+      return;
+    }
+
+    // Check if OTP matches generated code or fallback test code 1234
+    if (otp !== generatedOtp && otp !== '1234') {
+      setError('❌ Galat OTP! Kripya upar notification me aaya hua 4-digit code enter karein.');
       return;
     }
 
@@ -221,8 +283,61 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     onLoginSuccess(demoUser, false);
   };
 
+  // Resend timer effect
+  useEffect(() => {
+    if (stage !== 'otp-verify' || resendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setResendTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [stage, resendTimer]);
+
   return (
     <div className="fixed inset-0 z-50 w-full h-full min-h-[100dvh] bg-[#F4F8F6] overflow-y-auto flex flex-col items-center select-none">
+      {/* ========================================================= */}
+      {/* TOP FLOATING IN-APP SMS / NOTIFICATION BANNER             */}
+      {/* ========================================================= */}
+      {otpNotification?.show && stage === 'otp-verify' && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 w-[92%] max-w-sm z-[100] animate-in slide-in-from-top-6 duration-300">
+          <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-2xl border border-emerald-500/40 flex items-start gap-3 ring-1 ring-white/10">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 flex items-center justify-center shrink-0 shadow-sm font-black text-sm">
+              💬
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                  <span>Messages</span>
+                  <span className="text-slate-400">• Real Money</span>
+                </span>
+                <span className="text-[10px] text-slate-400">Just now</span>
+              </div>
+              <p className="text-xs text-slate-200 mt-1 leading-snug">
+                Your login verification OTP is <strong className="text-yellow-300 font-mono text-base px-2 py-0.5 bg-slate-800 rounded-md border border-slate-600 tracking-widest">{otpNotification.code}</strong>. Valid for 10 min.
+              </p>
+              <div className="mt-2.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtp(otpNotification.code);
+                  }}
+                  className="text-[11px] font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1 rounded-lg transition-all active:scale-95 cursor-pointer shadow-xs flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Tap to Fill ({otpNotification.code})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOtpNotification((prev) => (prev ? { ...prev, show: false } : null))}
+                  className="text-[11px] font-bold text-slate-400 hover:text-slate-200 px-2 py-1 cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-md min-h-[100dvh] bg-white flex flex-col shadow-none sm:shadow-2xl sm:border-x sm:border-slate-100">
         {/* ========================================================= */}
         {/* HEADER: Clean, Minimal & Premium Emerald Header           */}
@@ -636,12 +751,12 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         {stage === 'otp-verify' && (
           <form onSubmit={handleVerifyOtp} className="p-6 sm:p-7 flex-1 grow flex flex-col justify-between space-y-4">
             <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-2">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-2 shadow-xs">
                 <Lock className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-black text-slate-900">OTP Enter Karein</h3>
+              <h3 className="text-base font-black text-slate-900">4-Digit OTP Enter Karein</h3>
               <p className="text-xs text-slate-500 font-medium">
-                +91 {phone} par 4-digit ka verification code bheja gaya hai
+                Screen ke upar <strong>Messages notification</strong> me aaya 4-digit code daalein
               </p>
             </div>
 
@@ -651,35 +766,70 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
               </div>
             )}
 
-            <div className="space-y-2">
-              <input
-                type="text"
-                maxLength={4}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="• • • •"
-                className="w-full py-3.5 text-center text-2xl font-black tracking-[1em] text-slate-900 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-emerald-600 focus:bg-white focus:outline-none transition-all"
-                autoFocus
-              />
+            {/* 4 Distinct OTP Display Boxes */}
+            <div className="space-y-3">
+              <div className="relative flex justify-center items-center gap-2.5">
+                {[0, 1, 2, 3].map((index) => {
+                  const digit = otp[index] || '';
+                  const isCurrent = otp.length === index;
+                  return (
+                    <div
+                      key={index}
+                      className={`w-13 h-14 rounded-2xl flex items-center justify-center text-2xl font-black transition-all ${
+                        digit
+                          ? 'bg-emerald-50 border-2 border-emerald-500 text-emerald-950 shadow-sm'
+                          : isCurrent
+                          ? 'bg-white border-2 border-emerald-600 shadow-md ring-2 ring-emerald-400/20 animate-pulse'
+                          : 'bg-slate-50 border border-slate-200 text-slate-400'
+                      }`}
+                    >
+                      {digit ? digit : isCurrent ? <span className="w-0.5 h-6 bg-emerald-600 animate-blink" /> : '•'}
+                    </div>
+                  );
+                })}
 
-              {/* Auto Fill Demo OTP button */}
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={() => setOtp('1234')}
-                  className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full cursor-pointer flex items-center gap-1"
-                >
-                  <Sparkles className="w-3 h-3 text-amber-500" />
-                  <span>Auto-Fill 1234 (Test OTP)</span>
-                </button>
-                <span className="text-xs text-slate-400">Resend in 30s</span>
+                {/* Hidden Overlay Input for native mobile keyboard */}
+                <input
+                  type="tel"
+                  maxLength={4}
+                  value={otp}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    setOtp(clean);
+                  }}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  autoFocus
+                />
+              </div>
+
+              {/* Notification Helper Bar */}
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 text-slate-600 font-bold">
+                  <Bell className="w-3.5 h-3.5 text-emerald-600 animate-bounce" />
+                  <span>OTP code notification me hai</span>
+                </div>
+                {resendTimer > 0 ? (
+                  <span className="text-[11px] font-bold text-slate-400">Resend in {resendTimer}s</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 underline cursor-pointer"
+                  >
+                    Naya OTP Bhejein
+                  </button>
+                )}
               </div>
             </div>
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm transition-all shadow-[0_6px_20px_rgba(5,150,105,0.3)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+              disabled={loading || otp.length < 4}
+              className={`w-full py-3.5 rounded-2xl font-black text-sm transition-all shadow-[0_6px_20px_rgba(5,150,105,0.3)] flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
+                otp.length === 4
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/25'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+              }`}
             >
               <span>{loading ? 'Verify Ho Raha Hai...' : 'Verify & Continue'}</span>
               <CheckCircle2 className="w-4 h-4" />

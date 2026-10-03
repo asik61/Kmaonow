@@ -43,6 +43,7 @@ import type {
 import { compressScreenshot } from '../utils/compressScreenshot';
 
 interface AdminPanelProps {
+  currentUser?: UserProfile;
   tasks: TaskItem[];
   submissions: TaskSubmission[];
   withdrawals: WithdrawalRequest[];
@@ -85,6 +86,7 @@ const PRESET_ICONS = [
 ];
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
+  currentUser,
   tasks,
   submissions,
   withdrawals,
@@ -108,6 +110,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onToggleNoticeActive,
   onClose,
 }) => {
+  // STRICT MASTER ADMIN AUTHENTICATION: ONLY asik94906@gmail.com CAN OPEN ADMIN PANEL
+  const isMasterAdmin = currentUser?.email?.trim().toLowerCase() === 'asik94906@gmail.com';
+
+  if (!isMasterAdmin) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md p-4 flex items-center justify-center text-white">
+        <div className="w-full max-w-md rounded-3xl bg-[#091510] border-2 border-rose-500/50 shadow-2xl p-6 text-center space-y-4 animate-in zoom-in-95 duration-200">
+          <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-500 flex items-center justify-center mx-auto shadow-inner">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div>
+            <span className="text-[11px] font-black uppercase tracking-wider text-rose-400 bg-rose-950/70 border border-rose-800/60 px-3 py-1 rounded-full">
+              Access Restricted
+            </span>
+            <h2 className="text-xl font-black text-white mt-2">
+              Admin Desk Locked 🔒
+            </h2>
+            <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+              Yeh Admin Control Desk sirf Master Admin account <strong className="text-amber-300 font-mono">asik94906@gmail.com</strong> se hi khul sakta hai.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/10 text-left space-y-1">
+            <div className="text-[10px] uppercase font-bold text-slate-400">Current Logged-in Account:</div>
+            <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span>{currentUser?.name || 'User'} ({currentUser?.email || 'Guest / Non-admin'})</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm transition-all shadow-md active:scale-98 cursor-pointer"
+          >
+            App Par Wapas Jayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const [tab, setTab] = useState<'tasks' | 'notices' | 'users' | 'proofs' | 'withdrawals' | 'database'>('tasks');
 
   // Proofs state
@@ -203,6 +248,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-xs text-emerald-400 font-mono font-bold uppercase tracking-wider">
                 Real Money App Admin Master Control
+              </span>
+              <span className="text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md">
+                asik94906@gmail.com
               </span>
             </div>
             <h1 className="text-lg sm:text-xl font-black text-white mt-0.5">

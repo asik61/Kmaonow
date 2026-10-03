@@ -272,6 +272,9 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Master Admin Email Check: ONLY asik94906@gmail.com has Admin permissions
+  const isMasterAdmin = user?.email?.trim().toLowerCase() === 'asik94906@gmail.com';
+
   // Sync state to localStorage & test Firestore connection
   useEffect(() => {
     testConnection().catch(console.warn);
@@ -1222,14 +1225,16 @@ export default function App() {
             <span>📜 Niyam</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowAdminPanel(true)}
-            className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-emerald-200 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            title="Admin Desk"
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-          </button>
+          {isMasterAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowAdminPanel(true)}
+              className="w-7 h-7 rounded-full bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-amber-400/30"
+              title="Admin Master Desk (asik94906@gmail.com)"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           <button
             type="button"
@@ -1470,14 +1475,20 @@ export default function App() {
                   <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
                     Admin Panel se jo bhi offers add honge, wo yahan live dikhenge.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdminPanel(true)}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Admin Desk Se Offer Dalein</span>
-                  </button>
+                  {isMasterAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPanel(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Admin Desk Se Offer Dalein</span>
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 inline-block">
+                      Naye offers jald hi aane wale hain!
+                    </span>
+                  )}
                 </div>
               ) : (
                 tasks
@@ -1586,14 +1597,20 @@ export default function App() {
                       Yahan sirf wahi offers show honge jo aap Admin Desk se create karenge.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdminPanel(true)}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>+ Admin Desk Se Offer Add Karein</span>
-                  </button>
+                  {isMasterAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPanel(true)}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>+ Admin Desk Se Offer Add Karein</span>
+                    </button>
+                  ) : (
+                    <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200 inline-block">
+                      Har roz naye tasks check karein!
+                    </span>
+                  )}
                 </div>
               ) : (
                 filteredTasks.map((task) => (
@@ -1707,14 +1724,20 @@ export default function App() {
                       Admin Desk se jo bhi offers add kiye jayenge, wo yahan live honge.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdminPanel(true)}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>+ Admin Desk Se Offer Add Karein</span>
-                  </button>
+                  {isMasterAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPanel(true)}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs inline-flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>+ Admin Desk Se Offer Add Karein</span>
+                    </button>
+                  ) : (
+                    <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-200 inline-block">
+                      Har roz check karein naye offers ke liye!
+                    </span>
+                  )}
                 </div>
               ) : (
                 filteredOffers.map((offer) => (
@@ -2028,17 +2051,27 @@ export default function App() {
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowAdminPanel(true)}
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left bg-amber-50/50"
-              >
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="w-4 h-4 text-amber-600" />
-                  <span className="font-bold text-amber-900">Admin Operations Desk</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-amber-600" />
-              </button>
+              {isMasterAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminPanel(true)}
+                  className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left bg-amber-50/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="w-4 h-4 text-amber-600" />
+                    <div>
+                      <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                        <span>Admin Operations Desk</span>
+                        <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded-md">
+                          asik94906@gmail.com
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-amber-700 font-medium">Manage Tasks, Users, Proofs & Payouts</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-600" />
+                </button>
+              )}
 
               <button
                 type="button"
@@ -2304,6 +2337,7 @@ export default function App() {
       {/* ADMIN PANEL (PWA Manual Admin Master Control) */}
       {showAdminPanel && (
         <AdminPanel
+          currentUser={user}
           tasks={tasks}
           submissions={submissions}
           withdrawals={withdrawals}

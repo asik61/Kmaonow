@@ -249,17 +249,19 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       setLoading(false);
       const cleanPhone = phone.replace(/\D/g, '');
       const userCode = `RM${cleanPhone.slice(-4)}${Math.floor(100 + Math.random() * 900)}`;
+      const userEmail = googleUser ? googleUser.email.trim().toLowerCase() : `${cleanPhone}@realmoneyapp.online`;
+      const isMasterAdmin = userEmail === 'asik94906@gmail.com';
 
       const finalUser: UserProfile = {
         id: `usr-${cleanPhone}`,
         name: (name || googleUser?.name || `User ${cleanPhone.slice(-4)}`).trim(),
         phone: `+91 ${cleanPhone}`,
-        email: googleUser ? googleUser.email : `${cleanPhone}@realmoneyapp.online`,
+        email: userEmail,
         referral_code: userCode,
         referred_by: referralCode.trim() ? referralCode.trim().toUpperCase() : null,
         is_blocked: false,
         is_verified: true,
-        role: 'user',
+        role: isMasterAdmin ? 'admin' : 'user',
         avatar_url:
           googleUser?.avatar ||
           'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
@@ -283,10 +285,10 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   // Quick Demo Bypass
   const handleQuickDemo = () => {
     const demoUser: UserProfile = {
-      id: 'usr-demo-001',
-      name: 'Aman Sharma',
+      id: 'usr-asik-01',
+      name: 'Asik Khan (Master Admin)',
       phone: '+91 98765 43210',
-      email: 'aman.sharma@realmoneyapp.online',
+      email: 'asik94906@gmail.com',
       avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
       referral_code: 'REAL99',
       referred_by: null,

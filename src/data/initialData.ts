@@ -27,9 +27,9 @@ export const INITIAL_USER: UserProfile = {
 
 export const INITIAL_ADMIN: UserProfile = {
   id: 'usr-admin-01',
-  name: 'Real Money App Admin (Ops Desk)',
+  name: 'Asik Khan (Master Admin)',
   phone: '9999888877',
-  email: 'admin@realmoneyapp.online',
+  email: 'asik94906@gmail.com',
   referral_code: 'REALHQ',
   referred_by: null,
   is_blocked: false,

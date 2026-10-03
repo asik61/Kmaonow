@@ -302,8 +302,8 @@ const INITIAL_DB_DATA: D1Database = {
   admin_users: [
     {
       id: 'adm-1',
-      name: 'Super Admin',
-      email: 'admin@kamaonow.com',
+      name: 'Asik Khan (Master Admin)',
+      email: 'asik94906@gmail.com',
       role: 'super_admin',
       password_hash: 'admin123',
       created_at: '2026-09-01T00:00:00Z',

@@ -1962,17 +1962,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* 1 Phone = 1 Account Device Security Status Banner */}
-            <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-emerald-950 font-bold">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>1 Phone = 1 Account Protected</span>
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-md">
-                Active Device
-              </span>
-            </div>
-
             {/* Menu List -> CRISP WHITE CARD */}
             <div className="rounded-3xl bg-white border border-slate-100 divide-y divide-slate-100 overflow-hidden text-xs shadow-md text-slate-800">
               <button
@@ -2115,52 +2104,6 @@ export default function App() {
             </div>
           </div>
         )}
-        {/* SEO & AIO INFORMATION FOOTER */}
-        <section aria-label="About Real Money App SEO Information" className="pt-4 pb-14 text-slate-700">
-          <div className="p-4 sm:p-5 rounded-3xl bg-white/80 border border-slate-200/80 shadow-xs space-y-3.5 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <h2 className="font-black text-slate-900 text-xs sm:text-sm">
-                Real Money App (realmoneyapp.online) – Bharat Ka #1 Earning Platform
-              </h2>
-            </div>
-            
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Real Money App ek 100% free, zero-investment daily earning platform hai jahan aap simple tasks, 
-              CPA offers complete karke, daily 1 lucky free spin ghumakar, aur 1 free scratch card kholkar 
-              turant real cash kama sakte hain. Saara paisa bina kisi delay ke seedha aapke PhonePe, Google Pay, 
-              Paytm ya Bank Account me instant transfer hota hai.
-            </p>
-
-            <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-bold text-slate-900 block">🎁 ₹5.00 Welcome Bonus</span>
-                <span className="text-[10px] text-slate-500">1st Task pura karne par turant credit</span>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-bold text-slate-900 block">⚡ Instant UPI Payout</span>
-                <span className="text-[10px] text-slate-500">1st withdrawal min ₹20, uske baad ₹100</span>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-bold text-slate-900 block">🎡 Daily 1 Free Spin</span>
-                <span className="text-[10px] text-slate-500">Rozana lucky wheel se cash jeetein</span>
-              </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-bold text-slate-900 block">🎫 Daily 1 Scratch Card</span>
-                <span className="text-[10px] text-slate-500">Har raat 12 baje counter reset</span>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-              <span>© 2026 Real Money App • All Rights Reserved</span>
-              <div className="flex items-center gap-3">
-                <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 underline font-medium">Sitemap</a>
-                <a href="/robots.txt" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 underline font-medium">Robots</a>
-                <button type="button" onClick={() => setShowRulesModal(true)} className="hover:text-emerald-700 underline font-medium">Policies</button>
-              </div>
-            </div>
-          </div>
-        </section>
       </main>
 
       {/* ========================================================= */}

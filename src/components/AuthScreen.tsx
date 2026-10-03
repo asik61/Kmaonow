@@ -56,6 +56,7 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   const [referralCode, setReferralCode] = useState('');
   const [otp, setOtp] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
+  const [isOtpDelivering, setIsOtpDelivering] = useState(false);
   const [otpNotification, setOtpNotification] = useState<{ show: boolean; code: string } | null>(null);
   const [resendTimer, setResendTimer] = useState(30);
   const [error, setError] = useState('');
@@ -198,19 +199,33 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       setOtp(''); // Strict requirement: do NOT autofill! Let user enter it
       setStage('otp-verify');
       setResendTimer(30);
-      setOtpNotification({ show: true, code });
-      playNotificationChime();
-    }, 600);
+      setOtpNotification(null); // Hide initially so it arrives after 3 to 5 seconds
+      setIsOtpDelivering(true);
+
+      // Realistic SMS Delivery Delay (3.5 to 4.5 seconds as requested by user)
+      setTimeout(() => {
+        setIsOtpDelivering(false);
+        setOtpNotification({ show: true, code });
+        playNotificationChime();
+      }, 3800);
+    }, 400);
   };
 
   const handleResendOtp = () => {
-    if (resendTimer > 0) return;
+    if (resendTimer > 0 || isOtpDelivering) return;
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     setGeneratedOtp(code);
     setOtp('');
     setResendTimer(30);
-    setOtpNotification({ show: true, code });
-    playNotificationChime();
+    setOtpNotification(null);
+    setIsOtpDelivering(true);
+
+    // Realistic SMS delivery delay
+    setTimeout(() => {
+      setIsOtpDelivering(false);
+      setOtpNotification({ show: true, code });
+      playNotificationChime();
+    }, 3800);
   };
 
   // 4. Verify OTP and finalize registration
@@ -756,9 +771,35 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
               </div>
               <h3 className="text-base font-black text-slate-900">4-Digit OTP Enter Karein</h3>
               <p className="text-xs text-slate-500 font-medium">
-                Screen ke upar <strong>Messages notification</strong> me aaya 4-digit code daalein
+                Mobile (+91 {phone || 'XXXXX XXXXX'}) par bheja gaya 4-digit code
               </p>
             </div>
+
+            {/* Delivery Progress Bar / Realistic Status */}
+            {isOtpDelivering ? (
+              <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-amber-900 animate-pulse space-y-2">
+                <div className="flex items-center justify-between text-xs font-black">
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                    SMS Gateway se OTP aa raha hai...
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-700">3-5s wait</span>
+                </div>
+                <div className="w-full bg-amber-200 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-amber-600 h-full rounded-full animate-[progress_3.8s_ease-out_forwards] w-full" />
+                </div>
+                <p className="text-[11px] text-amber-800 font-medium">
+                  3-4 second me screen ke upar <strong>SMS notification</strong> pop-up aayega.
+                </p>
+              </div>
+            ) : (
+              otpNotification?.show && (
+                <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-emerald-600 animate-bounce shrink-0" />
+                  <span>SMS Aa Gaya! Screen ke upar se 4-digit code enter karein.</span>
+                </div>
+              )
+            )}
 
             {error && (
               <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 animate-shake">
@@ -805,16 +846,21 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
               {/* Notification Helper Bar */}
               <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 text-slate-600 font-bold">
-                  <Bell className="w-3.5 h-3.5 text-emerald-600 animate-bounce" />
-                  <span>OTP code notification me hai</span>
+                  <Bell className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>
+                    {isOtpDelivering
+                      ? 'SMS deliver ho raha hai...'
+                      : 'OTP screen ke notification me hai'}
+                  </span>
                 </div>
                 {resendTimer > 0 ? (
                   <span className="text-[11px] font-bold text-slate-400">Resend in {resendTimer}s</span>
                 ) : (
                   <button
                     type="button"
+                    disabled={isOtpDelivering}
                     onClick={handleResendOtp}
-                    className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 underline cursor-pointer"
+                    className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 underline cursor-pointer disabled:opacity-50"
                   >
                     Naya OTP Bhejein
                   </button>

@@ -1962,6 +1962,17 @@ export default function App() {
               </div>
             </div>
 
+            {/* 1 Phone = 1 Account Device Security Status Banner */}
+            <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-emerald-950 font-bold">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>1 Phone = 1 Account Protected</span>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-md">
+                Active Device
+              </span>
+            </div>
+
             {/* Menu List -> CRISP WHITE CARD */}
             <div className="rounded-3xl bg-white border border-slate-100 divide-y divide-slate-100 overflow-hidden text-xs shadow-md text-slate-800">
               <button
@@ -2051,39 +2062,42 @@ export default function App() {
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
 
+              {/* Master Admin ONLY: Operations Desk & Reset Seed */}
               {isMasterAdmin && (
-                <button
-                  type="button"
-                  onClick={() => setShowAdminPanel(true)}
-                  className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left bg-amber-50/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="w-4 h-4 text-amber-600" />
-                    <div>
-                      <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                        <span>Admin Operations Desk</span>
-                        <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded-md">
-                          asik94906@gmail.com
-                        </span>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPanel(true)}
+                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left bg-amber-50/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck className="w-4 h-4 text-amber-600" />
+                      <div>
+                        <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                          <span>Admin Operations Desk</span>
+                          <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded-md">
+                            asik94906@gmail.com
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-amber-700 font-medium">Manage Tasks, Users, Proofs & Payouts</div>
                       </div>
-                      <div className="text-[11px] text-amber-700 font-medium">Manage Tasks, Users, Proofs & Payouts</div>
                     </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-amber-600" />
-                </button>
-              )}
+                    <ChevronRight className="w-4 h-4 text-amber-600" />
+                  </button>
 
-              <button
-                type="button"
-                onClick={handleResetSeed}
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <RotateCcw className="w-4 h-4 text-slate-400" />
-                  <span className="font-bold text-slate-600">Reset Demo Data</span>
-                </div>
-                <span className="text-[11px] text-slate-400 font-mono">Clean State</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={handleResetSeed}
+                    className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left bg-slate-50/60"
+                  >
+                    <div className="flex items-center gap-3">
+                      <RotateCcw className="w-4 h-4 text-slate-500" />
+                      <span className="font-bold text-slate-700">Reset Demo Data (Admin Only)</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-mono">Clean State</span>
+                  </button>
+                </>
+              )}
 
               <button
                 type="button"
@@ -2092,9 +2106,11 @@ export default function App() {
               >
                 <div className="flex items-center gap-3">
                   <LogOut className="w-4 h-4 text-rose-600" />
-                  <span className="font-black text-rose-600">Log Out (Account Badlein)</span>
+                  <span className="font-black text-rose-600">
+                    {isMasterAdmin ? 'Log Out Admin Account' : 'Log Out'}
+                  </span>
                 </div>
-                <span className="text-[11px] text-rose-400 font-bold">Logout</span>
+                <span className="text-[11px] text-rose-400 font-bold">Log Out</span>
               </button>
             </div>
           </div>

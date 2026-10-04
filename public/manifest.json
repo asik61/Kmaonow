@@ -1,5 +1,5 @@
 {
-  "id": "https://realmoneyapp.online/",
+  "id": "/",
   "name": "Real Money App: Daily Cash, Spin & Instant UPI",
   "short_name": "Real Money App",
   "description": "Complete tasks, spin wheel, scratch cards, and withdraw real cash directly to your UPI. 100% free with zero investment.",
@@ -9,7 +9,7 @@
   "start_url": "/?source=pwa",
   "scope": "/",
   "orientation": "portrait",
-  "categories": ["finance", "lifestyle", "games"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/pwa-192x192.png",

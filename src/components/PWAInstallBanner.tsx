@@ -1,51 +1,105 @@
 import React, { useState } from 'react';
-import { Smartphone, X, MoreVertical, PlusSquare, ArrowDownToLine, CheckCircle2, Share } from 'lucide-react';
+import {
+  Smartphone,
+  X,
+  MoreVertical,
+  ArrowDownToLine,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
 export const PWAInstallBanner: React.FC = () => {
-  const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
+  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [installedSuccess, setInstalledSuccess] = useState(false);
 
   if (isInstalled || dismissed) return null;
 
   const handleInstallClick = async () => {
-    if (isInstallable) {
+    setIsInstalling(true);
+    try {
       const installed = await install();
-      if (!installed) {
+      if (installed) {
+        setInstalledSuccess(true);
+        setTimeout(() => {
+          setDismissed(true);
+        }, 3000);
+      } else {
         setShowGuideModal(true);
       }
-    } else {
+    } catch {
       setShowGuideModal(true);
+    } finally {
+      setIsInstalling(false);
     }
   };
 
   return (
     <>
-      <div className="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg">
+      <div className="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg relative overflow-hidden">
+        {/* Subtle glowing highlight */}
+        <div className="absolute top-0 right-0 -mt-2 -mr-2 w-20 h-20 bg-emerald-400/20 rounded-full blur-xl pointer-events-none" />
+
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-            <Smartphone className="w-4 h-4 text-white" />
+            {installedSuccess ? (
+              <CheckCircle2 className="w-4 h-4 text-amber-300 animate-bounce" />
+            ) : (
+              <Smartphone className="w-4 h-4 text-white" />
+            )}
           </div>
           <div>
-            <div className="text-xs font-bold leading-tight">Install Real Money App</div>
-            <div className="text-[10px] text-emerald-100">Roz fast access aur 1-tap rewards pao</div>
+            <div className="text-xs font-bold leading-tight flex items-center gap-1.5">
+              <span>{installedSuccess ? 'App Installed!' : 'Install Real Money App'}</span>
+              {!installedSuccess && (
+                <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full uppercase">
+                  Fast
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] text-emerald-100">
+              {installedSuccess
+                ? 'App aapke home screen par add ho gayi hai!'
+                : '1-click me home screen par install karein'}
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={handleInstallClick}
-            className="px-3.5 py-1.5 rounded-xl bg-white text-emerald-950 font-extrabold text-xs hover:bg-emerald-50 transition-colors shadow-sm cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95"
-          >
-            <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-700" />
-            <span>Install App</span>
-          </button>
+          {!installedSuccess ? (
+            <button
+              type="button"
+              disabled={isInstalling}
+              onClick={handleInstallClick}
+              className="px-3.5 py-1.5 rounded-xl bg-white text-emerald-950 font-black text-xs hover:bg-emerald-50 transition-all shadow-sm cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 disabled:opacity-75"
+            >
+              {isInstalling ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 text-emerald-700 animate-spin" />
+                  <span>Opening...</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Install App</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <div className="px-3 py-1 rounded-xl bg-emerald-500/40 text-white font-black text-xs flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Installed ✓</span>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => setDismissed(true)}
-            className="p-1 text-emerald-200 hover:text-white cursor-pointer"
+            className="p-1 text-emerald-200 hover:text-white cursor-pointer transition-colors"
             title="Dismiss"
           >
             <X className="w-3.5 h-3.5" />
@@ -115,13 +169,36 @@ export const PWAInstallBanner: React.FC = () => {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => setShowGuideModal(false)}
-              className="mt-2 w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all cursor-pointer shadow-md active:scale-98"
-            >
-              Theek Hai, Samjh Gaya
-            </button>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsInstalling(true);
+                  const ok = await install();
+                  setIsInstalling(false);
+                  if (ok) {
+                    setShowGuideModal(false);
+                    setInstalledSuccess(true);
+                  }
+                }}
+                disabled={isInstalling}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all cursor-pointer shadow-md active:scale-98 flex items-center justify-center gap-1.5"
+              >
+                {isInstalling ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <ArrowDownToLine className="w-3.5 h-3.5" />
+                )}
+                <span>1-Tap Install Try Karein</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer"
+              >
+                Band Karein
+              </button>
+            </div>
           </div>
         </div>
       )}

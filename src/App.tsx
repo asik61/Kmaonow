@@ -321,6 +321,19 @@ export default function App() {
     }
   }, []);
 
+  // Always ensure NAVI_TASK and default admin offers are live in state & localStorage
+  useEffect(() => {
+    setTasks((prev) => {
+      const hasNavi = prev.some((t) => t.id === NAVI_TASK.id || t.title.toLowerCase().includes('navi'));
+      if (!hasNavi) {
+        const updated = [NAVI_TASK, ...prev];
+        localStorage.setItem('kamaonow_tasks', JSON.stringify(updated));
+        return updated;
+      }
+      return prev;
+    });
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('kamaonow_user', JSON.stringify(user));
   }, [user]);

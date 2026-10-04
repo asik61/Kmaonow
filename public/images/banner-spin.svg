@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="spinBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#4C1D95"/>
+      <stop offset="50%" stopColor="#6D28D9"/>
+      <stop offset="100%" stopColor="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="goldRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#FEF08A"/>
+      <stop offset="50%" stopColor="#EAB308"/>
+      <stop offset="100%" stopColor="#CA8A04"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="360" rx="28" fill="url(#spinBg)"/>
+
+  <!-- Left Text -->
+  <g transform="translate(70, 110)">
+    <text x="0" y="0" fill="#FFFFFF" font-size="52" font-weight="900" font-family="system-ui, sans-serif">Spin &amp; <tspan fill="#FACC15">Win</tspan></text>
+    <text x="0" y="44" fill="#E9D5FF" font-size="22" font-weight="700" font-family="system-ui, sans-serif">Try your luck &amp; get instant rewards!</text>
+    
+    <!-- Spin Now Button -->
+    <g transform="translate(0, 110)">
+      <rect width="210" height="54" rx="27" fill="#FACC15"/>
+      <text x="105" y="34" text-anchor="middle" fill="#581C87" font-size="22" font-weight="900" font-family="system-ui, sans-serif">Spin Now →</text>
+    </g>
+  </g>
+
+  <!-- Right: 3D Spin Wheel -->
+  <g transform="translate(670, 180)">
+    <!-- Shadow -->
+    <ellipse cx="0" cy="130" rx="140" ry="25" fill="#000000" opacity="0.3"/>
+    
+    <!-- Outer Gold Rim -->
+    <circle cx="0" cy="0" r="140" fill="url(#goldRim)" stroke="#CA8A04" stroke-width="6"/>
+    <circle cx="0" cy="0" r="126" fill="#1E1B4B" stroke="#FDE047" stroke-width="4"/>
+
+    <!-- Wheel Segments -->
+    <!-- Segment 1: Rose -->
+    <path d="M0 0 L0 -124 A124 124 0 0 1 87 -87 Z" fill="#F43F5E"/>
+    <!-- Segment 2: Amber -->
+    <path d="M0 0 L87 -87 A124 124 0 0 1 124 0 Z" fill="#F59E0B"/>
+    <!-- Segment 3: Emerald -->
+    <path d="M0 0 L124 0 A124 124 0 0 1 87 87 Z" fill="#10B981"/>
+    <!-- Segment 4: Sky Blue -->
+    <path d="M0 0 L87 87 A124 124 0 0 1 0 124 Z" fill="#0EA5E9"/>
+    <!-- Segment 5: Purple -->
+    <path d="M0 0 L0 124 A124 124 0 0 1 -87 87 Z" fill="#8B5CF6"/>
+    <!-- Segment 6: Yellow -->
+    <path d="M0 0 L-87 87 A124 124 0 0 1 -124 0 Z" fill="#EAB308"/>
+    <!-- Segment 7: Indigo -->
+    <path d="M0 0 L-124 0 A124 124 0 0 1 -87 -87 Z" fill="#6366F1"/>
+    <!-- Segment 8: Orange -->
+    <path d="M0 0 L-87 -87 A124 124 0 0 1 0 -124 Z" fill="#F97316"/>
+
+    <!-- Spokes -->
+    <circle cx="0" cy="0" r="32" fill="url(#goldRim)" stroke="#92400E" stroke-width="3"/>
+    <circle cx="0" cy="0" r="18" fill="#FFFFFF"/>
+
+    <!-- Indicator Pin Top -->
+    <path d="M-14 -140 L0 -112 L14 -140 Z" fill="#EF4444" stroke="#FFFFFF" stroke-width="2.5"/>
+    <circle cx="0" cy="-140" r="10" fill="#DC2626"/>
+
+    <!-- Floating Gold Coins -->
+    <circle cx="-135" cy="85" r="18" fill="#FACC15" stroke="#CA8A04" stroke-width="2"/>
+    <circle cx="140" cy="70" r="22" fill="#FACC15" stroke="#CA8A04" stroke-width="2.5"/>
+  </g>
+</svg>

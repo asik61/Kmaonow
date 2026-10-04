@@ -1,0 +1,32 @@
+# Robots.txt for Real Money App (realmoneyapp.online)
+# https://realmoneyapp.online/robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/admin
+
+# AI Search Crawlers & Generative Engine Optimization (GEO/AIO)
+User-agent: Googlebot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Sitemap Index
+Sitemap: https://realmoneyapp.online/sitemap.xml

@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account information and referral metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "referral_code": { "type": "string", "maxLength": 20 },
+        "referred_by": { "type": "string", "maxLength": 20 },
+        "is_blocked": { "type": "boolean" },
+        "is_verified": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "avatar_url": { "type": "string", "maxLength": 500 },
+        "created_at": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "UserWallet": {
+      "title": "UserWallet",
+      "description": "User balance, earnings, and withdrawal metrics",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "maxLength": 128 },
+        "balance": { "type": "number" },
+        "pending_balance": { "type": "number" },
+        "lifetime_earned": { "type": "number" },
+        "lifetime_withdrawn": { "type": "number" },
+        "updated_at": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["user_id", "balance", "pending_balance"]
+    },
+    "TaskSubmission": {
+      "title": "TaskSubmission",
+      "description": "User proof submission for a task offer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "task_id": { "type": "string", "maxLength": 128 },
+        "task_title": { "type": "string", "maxLength": 200 },
+        "reward_amount": { "type": "number" },
+        "proof_text": { "type": "string", "maxLength": 500 },
+        "proof_screenshot_url": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "created_at": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "user_id", "task_id", "status"]
+    },
+    "WithdrawalRequest": {
+      "title": "WithdrawalRequest",
+      "description": "UPI / Bank cash payout request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "amount": { "type": "number" },
+        "method": { "type": "string", "enum": ["upi", "bank"] },
+        "upi_id": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "created_at": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "user_id", "amount", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Public and private user profiles"
+    },
+    "/wallets/{userId}": {
+      "schema": "UserWallet",
+      "description": "User financial balance and ledger summary"
+    },
+    "/submissions/{submissionId}": {
+      "schema": "TaskSubmission",
+      "description": "Task verification proofs submitted by users"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "WithdrawalRequest",
+      "description": "UPI withdrawal payout queue"
+    }
+  }
+}

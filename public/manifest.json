@@ -1,0 +1,62 @@
+{
+  "id": "/",
+  "name": "Real Money",
+  "short_name": "Real Money",
+  "description": "Daily Real Cash & Instant UPI Withdrawal",
+  "theme_color": "#047857",
+  "background_color": "#022C22",
+  "display": "standalone",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "orientation": "portrait",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Daily Spin & Win",
+      "short_name": "Spin",
+      "description": "Spin the lucky wheel for instant cash",
+      "url": "/?tab=spin&source=pwa",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Withdraw Cash",
+      "short_name": "Withdraw",
+      "description": "Instant UPI Cash Withdrawal",
+      "url": "/?tab=withdraw&source=pwa",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Refer & Earn",
+      "short_name": "Refer",
+      "description": "Invite friends and earn extra cash",
+      "url": "/?tab=refer&source=pwa",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

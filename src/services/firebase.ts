@@ -103,6 +103,36 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile | nu
   }
 }
 
+export async function findUserByEmail(email: string): Promise<UserProfile | null> {
+  const path = 'users';
+  try {
+    const norm = email.trim().toLowerCase();
+    const q = query(collection(db, 'users'), where('email', '==', norm));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return snap.docs[0].data() as UserProfile;
+    }
+  } catch (error) {
+    console.warn('findUserByEmail Firestore lookup fallback:', error);
+  }
+  return null;
+}
+
+export async function findUserByPhone(phone: string): Promise<UserProfile | null> {
+  const path = 'users';
+  try {
+    const clean = phone.replace(/\D/g, '');
+    const q = query(collection(db, 'users'), where('phone', '==', `+91 ${clean}`));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      return snap.docs[0].data() as UserProfile;
+    }
+  } catch (error) {
+    console.warn('findUserByPhone Firestore lookup fallback:', error);
+  }
+  return null;
+}
+
 // User Wallet helpers
 export async function syncUserWallet(userId: string, wallet: WalletState): Promise<void> {
   const path = `wallets/${userId}`;

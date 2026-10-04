@@ -48,7 +48,34 @@ export const INITIAL_WALLET: WalletState = {
   updated_at: new Date().toISOString(),
 };
 
-export const INITIAL_TASKS: TaskItem[] = [];
+export const NAVI_TASK: TaskItem = {
+  id: 'task-admin-navi-01',
+  title: 'Navi: UPI, Loans & Mutual Funds',
+  subtitle: 'Install & Register with Mobile',
+  description: 'Download Navi app from Play Store, complete registration using your mobile number, setup UPI or start investing with just ₹10 to unlock ₹25 instant cash reward.',
+  category: 'Register',
+  reward_amount: 25.00,
+  instructions: [
+    'Click on "Start Offer" button to open Navi App in Google Play Store.',
+    'Download and install the official Navi app on your mobile phone.',
+    'Open the app and complete registration with your active mobile number and OTP.',
+    'Link your bank account with UPI or complete KYC verification.',
+    'Take a clear screenshot of the Navi home screen / registered profile page.',
+    'Upload the screenshot here and tap Submit Proof to receive ₹25 cash reward directly in your wallet!'
+  ],
+  partner_url: 'https://play.google.com/store/apps/details?id=com.naviapp',
+  icon_label: 'NAVI',
+  icon_bg: '#059669',
+  image_url: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=400&q=80',
+  is_active: true,
+  is_top_offer: true,
+  is_trending: true,
+  is_admin_created: true,
+  created_by: 'admin',
+  created_at: new Date().toISOString(),
+};
+
+export const INITIAL_TASKS: TaskItem[] = [NAVI_TASK];
 
 export const INITIAL_SUBMISSIONS: TaskSubmission[] = [];
 

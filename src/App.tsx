@@ -47,6 +47,7 @@ import {
   INITIAL_USER,
   INITIAL_WALLET,
   INITIAL_TASKS,
+  NAVI_TASK,
   INITIAL_SUBMISSIONS,
   INITIAL_LEDGER,
   INITIAL_REFERRALS,
@@ -158,17 +159,23 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Keep only tasks created by Admin from Admin Panel (remove all demo offers)
-          return parsed.filter(
+          const validTasks = parsed.filter(
             (t: TaskItem) =>
               t.is_admin_created ||
               t.created_by === 'admin' ||
               t.id.startsWith('task-admin-')
           );
+          const hasNavi = validTasks.some(
+            (t) => t.id === NAVI_TASK.id || t.title.toLowerCase().includes('navi')
+          );
+          if (!hasNavi) {
+            return [NAVI_TASK, ...validTasks];
+          }
+          return validTasks;
         }
-        return [];
+        return [NAVI_TASK];
       } catch {
-        return [];
+        return INITIAL_TASKS;
       }
     }
     return INITIAL_TASKS;
@@ -292,15 +299,18 @@ export default function App() {
         return cleaned;
       });
       setTasks((prev) => {
-        // Keep ONLY admin-created tasks, wipe all demo tasks as requested
         const cleaned = prev.filter(
           (t) =>
             t.is_admin_created ||
             t.created_by === 'admin' ||
             t.id.startsWith('task-admin-')
         );
-        localStorage.setItem('kamaonow_tasks', JSON.stringify(cleaned));
-        return cleaned;
+        const hasNavi = cleaned.some(
+          (t) => t.id === NAVI_TASK.id || t.title.toLowerCase().includes('navi')
+        );
+        const finalTasks = hasNavi ? cleaned : [NAVI_TASK, ...cleaned];
+        localStorage.setItem('kamaonow_tasks', JSON.stringify(finalTasks));
+        return finalTasks;
       });
       setSubmissions((prev) => {
         const cleaned = prev.filter((s) => !['sub-001', 'sub-002', 'sub-003'].includes(s.id));

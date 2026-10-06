@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Eye,
   Sparkles,
+  Lock,
 } from 'lucide-react';
 import type {
   TaskItem,

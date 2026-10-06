@@ -1,31 +1,52 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Sparkles, Clock, CheckCircle2 } from 'lucide-react';
+import {
+  Sparkles,
+  Clock,
+  CheckCircle2,
+  ArrowLeft,
+  Bell,
+  ChevronRight,
+  ShieldCheck,
+  Crown,
+} from 'lucide-react';
 
 interface ScratchCardProps {
+  freeScratchesLeft?: number;
+  totalDailyScratches?: number;
   dailyClaimed: boolean;
   onRewardWon: (amount: number) => void;
+  onBack?: () => void;
+  onOpenRules?: () => void;
+  onOpenNotifications?: () => void;
+  unreadNotificationsCount?: number;
 }
 
 const PRIZES = [
-  { label: '₹0.10', value: 0.10 },
-  { label: '₹0.15', value: 0.15 },
   { label: '₹0.25', value: 0.25 },
-  { label: '₹0.25', value: 0.25 },
-  { label: '₹0.35', value: 0.35 },
   { label: '₹0.35', value: 0.35 },
   { label: '₹0.50', value: 0.50 },
   { label: '₹1.00', value: 1.00 },
+  { label: '₹0.15', value: 0.15 },
+  { label: '₹0.40', value: 0.40 },
 ];
 
-const SPARKLES = ['✦★✦', '⭐✨⭐', '💫⭐💫', '✨💰✨', '🌟✦🌟'];
-
-export const ScratchCard: React.FC<ScratchCardProps> = ({ dailyClaimed, onRewardWon }) => {
-  const [currentPrize, setCurrentPrize] = useState(PRIZES[6]);
-  const [sparkle, setSparkle] = useState('✦★✦');
-  const [serial, setSerial] = useState('TC-784920');
+export const ScratchCard: React.FC<ScratchCardProps> = ({
+  freeScratchesLeft = 3,
+  totalDailyScratches = 3,
+  dailyClaimed,
+  onRewardWon,
+  onBack,
+  onOpenRules,
+  onOpenNotifications,
+  unreadNotificationsCount = 6,
+}) => {
+  const [currentPrize, setCurrentPrize] = useState(() => {
+    return PRIZES[Math.floor(Math.random() * PRIZES.length)];
+  });
   const [scratchedPct, setScratchedPct] = useState(dailyClaimed ? 100 : 0);
   const [isRevealed, setIsRevealed] = useState(dailyClaimed);
-  const [hasClaimed, setHasClaimed] = useState(dailyClaimed);
+  const [hasClaimedCurrent, setHasClaimedCurrent] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
   const [midnightTimer, setMidnightTimer] = useState<string>('');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -33,6 +54,9 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ dailyClaimed, onReward
   const isRevealedRef = useRef(dailyClaimed);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const isOutOfScratches = freeScratchesLeft <= 0 || dailyClaimed;
+  const usedScratches = totalDailyScratches - freeScratchesLeft;
 
   // Live Countdown to Midnight
   useEffect(() => {
@@ -58,7 +82,6 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ dailyClaimed, onReward
     return () => clearInterval(interval);
   }, []);
 
-  // Web Audio Context helper
   const getAudioContext = useCallback(() => {
     if (!audioCtxRef.current) {
       const AudioCtx =
@@ -79,27 +102,27 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ dailyClaimed, onReward
       const ac = getAudioContext();
       if (!ac) return;
       const t = ac.currentTime;
-      const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.06), ac.sampleRate);
+      const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.05), ac.sampleRate);
       const data = buf.getChannelData(0);
       for (let i = 0; i < data.length; i++) {
-        data[i] = (Math.random() * 2 - 1) * 0.35;
+        data[i] = (Math.random() * 2 - 1) * 0.3;
       }
       const src = ac.createBufferSource();
       const g = ac.createGain();
       const f = ac.createBiquadFilter();
       f.type = 'bandpass';
-      f.frequency.value = 2800;
-      f.Q.value = 0.6;
+      f.frequency.value = 2900;
+      f.Q.value = 0.5;
       src.buffer = buf;
       src.connect(f);
       f.connect(g);
       g.connect(ac.destination);
-      g.gain.setValueAtTime(0.4, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+      g.gain.setValueAtTime(0.35, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
       src.start(t);
-      src.stop(t + 0.06);
+      src.stop(t + 0.05);
     } catch {
-      // Audio autoplay policy fallback
+      // fallback
     }
   }, [getAudioContext]);
 
@@ -109,10 +132,10 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ dailyClaimed, onReward
       if (!ac) return;
       const notes: [number, number][] = [
         [523.25, 0],
-        [659.25, 0.13],
-        [783.99, 0.26],
-        [1046.5, 0.39],
-        [1318.5, 0.52],
+        [659.25, 0.12],
+        [783.99, 0.24],
+        [1046.5, 0.36],
+        [1318.5, 0.48],
       ];
       notes.forEach(([f, d]) => {
         const o = ac.createOscillator();
@@ -129,337 +152,496 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({ dailyClaimed, onReward
         o.stop(b + 0.5);
       });
     } catch {
-      // Ignore
+      // fallback
     }
   }, [getAudioContext]);
 
   const initScratchSurface = useCallback(() => {
     const cv = canvasRef.current;
     if (!cv) return;
-    const W = cv.offsetWidth || 262;
-    const H = 175;
-    cv.width = W;
-    cv.height = H;
+    const W = cv.offsetWidth || 280;
+    const H = 190;
+
+    const dpr = window.devicePixelRatio || 2;
+    cv.width = W * dpr;
+    cv.height = H * dpr;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
 
-    // Metallic Textured Pattern
-    for (let y = 0; y < H; y++) {
-      const n = Math.sin(y * 0.3) * 18 + Math.cos(y * 0.7) * 10;
-      const l = Math.floor(140 + n + Math.random() * 8);
-      ctx.fillStyle = `rgb(${l},${l},${Math.min(255, l + 12)})`;
-      ctx.fillRect(0, y, W, 1);
-    }
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
 
-    const sh = ctx.createLinearGradient(0, 0, W * 0.6, H * 0.5);
-    sh.addColorStop(0, 'rgba(255,255,255,0.55)');
-    sh.addColorStop(0.5, 'rgba(255,255,255,0.1)');
-    sh.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = sh;
+    // High-Quality Brushed Silver Metallic Texture
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#F1F5F9');
+    grad.addColorStop(0.25, '#E2E8F0');
+    grad.addColorStop(0.5, '#CBD5E1');
+    grad.addColorStop(0.75, '#94A3B8');
+    grad.addColorStop(1, '#64748B');
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = 'rgba(60,60,70,0.65)';
-    ctx.font = 'bold 14px system-ui, sans-serif';
+    // Brushed metal streaks
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    for (let i = 0; i < H; i += 3) {
+      ctx.fillRect(0, i, W, 1);
+    }
+
+    // Outer subtle border
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, 0, W, H);
+
+    // Centered Guide
+    const cx = W / 2;
+    const cy = H / 2;
+
+    // Radiating soundwave tactile brackets
+    ctx.strokeStyle = '#0F172A';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    ctx.arc(cx - 24, cy - 35, 14, 0.75 * Math.PI, 1.25 * Math.PI);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx + 24, cy - 35, 14, -0.25 * Math.PI, 0.25 * Math.PI);
+    ctx.stroke();
+
+    // Hand Touch Icon Emoji
+    ctx.font = '26px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('✦  SCRATCH HERE  ✦', W / 2, H / 2 - 12);
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(50,50,60,0.5)';
-    ctx.fillText('Ungli se scratch karein aur jeetein', W / 2, H / 2 + 12);
+    ctx.fillText('👆', cx, cy - 35);
+
+    // Text Label: "SCRATCH HERE"
+    ctx.font = '900 13px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#0F172A';
+    ctx.fillText('SCRATCH HERE', cx, cy + 2);
+
+    // Subtext: "Yahan ungli se ghishein"
+    ctx.font = '700 10px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#475569';
+    ctx.fillText('Yahan ungli se ghishein', cx, cy + 20);
+
+    ctx.restore();
   }, []);
 
   useEffect(() => {
-    if (dailyClaimed) {
-      isRevealedRef.current = true;
-      setIsRevealed(true);
-      setHasClaimed(true);
-      setScratchedPct(100);
-      const cv = canvasRef.current;
-      if (cv) {
-        const ctx = cv.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, cv.width, cv.height);
-        }
-      }
-    } else {
-      isRevealedRef.current = false;
+    if (!isOutOfScratches) {
+      initScratchSurface();
       setIsRevealed(false);
-      setHasClaimed(false);
+      isRevealedRef.current = false;
+      setHasClaimedCurrent(false);
       setScratchedPct(0);
-      lastPosRef.current = null;
-      isDownRef.current = false;
-
-      const chosenPrize = PRIZES[Math.floor(Math.random() * PRIZES.length)];
-      setCurrentPrize(chosenPrize);
-      setSparkle(SPARKLES[Math.floor(Math.random() * SPARKLES.length)]);
-      setSerial('TC-' + Math.floor(100000 + Math.random() * 900000));
-
-      setTimeout(() => {
-        initScratchSurface();
-      }, 50);
     }
-  }, [dailyClaimed, initScratchSurface]);
+  }, [freeScratchesLeft, isOutOfScratches, initScratchSurface]);
 
-  // Touch and mouse scratch handlers
-  const handleStart = (clientX: number, clientY: number) => {
-    if (isRevealedRef.current || dailyClaimed) return;
-    isDownRef.current = true;
-    const cv = canvasRef.current;
-    if (!cv) return;
-    const r = cv.getBoundingClientRect();
-    lastPosRef.current = { x: clientX - r.left, y: clientY - r.top };
-    handleMove(clientX, clientY);
-  };
-
-  const handleMove = (clientX: number, clientY: number) => {
-    if (!isDownRef.current || isRevealedRef.current || dailyClaimed) return;
+  const scratchAt = (x: number, y: number) => {
+    if (isRevealed || isOutOfScratches) return;
     const cv = canvasRef.current;
     if (!cv) return;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
-    const r = cv.getBoundingClientRect();
-    const x = clientX - r.left;
-    const y = clientY - r.top;
 
+    const dpr = window.devicePixelRatio || 2;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.arc(x, y, 22, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.lineWidth = 36;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     if (lastPosRef.current) {
       ctx.beginPath();
-      ctx.lineWidth = 44;
-      ctx.lineCap = 'round';
       ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
       ctx.lineTo(x, y);
       ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, 18, 0, Math.PI * 2);
+      ctx.fill();
     }
-    lastPosRef.current = { x, y };
+    ctx.restore();
 
+    lastPosRef.current = { x, y };
     playScratchSound();
 
-    // Check scratch progress
+    // Compute progress
+    checkScratchProgress();
+  };
+
+  const checkScratchProgress = () => {
+    if (isRevealedRef.current) return;
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+
     try {
-      const W = cv.width;
-      const H = cv.height;
-      const step = 8;
-      const imgData = ctx.getImageData(0, 0, W, H);
+      const step = 16;
+      const w = cv.width;
+      const h = cv.height;
+      const imgData = ctx.getImageData(0, 0, w, h);
       const data = imgData.data;
       let clearCount = 0;
       let totalCount = 0;
 
-      for (let py = 0; py < H; py += step) {
-        for (let px = 0; px < W; px += step) {
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
           totalCount++;
-          const idx = (py * W + px) * 4 + 3;
+          const idx = (y * w + x) * 4 + 3;
           if (data[idx] < 128) {
             clearCount++;
           }
         }
       }
 
-      const pct = Math.min(100, Math.round((clearCount / totalCount) * 100));
+      const pct = Math.round((clearCount / totalCount) * 100);
       setScratchedPct(pct);
 
       if (pct >= 45 && !isRevealedRef.current) {
-        revealCard(ctx, W, H);
+        isRevealedRef.current = true;
+        setIsRevealed(true);
+        setScratchedPct(100);
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        playWinJingle();
+        setShowResultModal(true);
       }
     } catch {
-      // Fallback
+      // fallback
     }
   };
 
-  const handleEnd = () => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isRevealed || isOutOfScratches) return;
+    isDownRef.current = true;
+    const r = canvasRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    lastPosRef.current = { x, y };
+    scratchAt(x, y);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDownRef.current || isRevealed || isOutOfScratches) return;
+    const r = canvasRef.current?.getBoundingClientRect();
+    if (!r) return;
+    scratchAt(e.clientX - r.left, e.clientY - r.top);
+  };
+
+  const handlePointerUp = () => {
     isDownRef.current = false;
     lastPosRef.current = null;
   };
 
-  const revealCard = (ctx: CanvasRenderingContext2D, W: number, H: number) => {
+  const handleAutoScratch = () => {
+    if (isRevealed || isOutOfScratches) return;
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+    }
     isRevealedRef.current = true;
     setIsRevealed(true);
     setScratchedPct(100);
-
-    ctx.clearRect(0, 0, W, H);
     playWinJingle();
+    setShowResultModal(true);
+  };
 
-    if (!hasClaimed && !dailyClaimed) {
-      setHasClaimed(true);
+  const handleClaim = () => {
+    if (!hasClaimedCurrent) {
+      setHasClaimedCurrent(true);
       onRewardWon(currentPrize.value);
     }
+    setShowResultModal(false);
+    // Pick next random prize for the next scratch card
+    setCurrentPrize(PRIZES[Math.floor(Math.random() * PRIZES.length)]);
   };
 
   return (
-    <div className="w-full flex justify-center py-2 animate-fade-in select-none">
-      <style>{`
-        @keyframes borderRainbow {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        @keyframes handMotion {
-          0%, 100% { transform: translateX(-6px); }
-          50% { transform: translateX(6px); }
-        }
-        @keyframes winPop {
-          0% { transform: scale(0.85); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-      `}</style>
-
-      {/* Main Container */}
-      <div className="relative w-full max-w-[400px] rounded-3xl p-5 text-center overflow-hidden bg-gradient-to-b from-[#0a3d2b] to-[#051f17] border border-amber-400/25 shadow-2xl">
-        {/* Top Badge */}
-        <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-300 text-xs font-bold mb-3 tracking-wide shadow-xs">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>Daily 1 Free Scratch Card Only • Instant Cash</span>
-        </div>
-
-        {/* Header Title */}
-        <div className="mb-4">
-          <h2 className="text-xl font-black text-white tracking-wide">
-            Lucky Scratch &amp; Win!
-          </h2>
-          <p className="text-white/60 text-xs mt-0.5 font-medium">
-            Rozana 1 free golden scratch card milta hai
-          </p>
-        </div>
-
-        {/* Scratch Card Outer Envelope */}
-        <div
-          className="relative w-full max-w-[320px] mx-auto rounded-3xl p-[3px] shadow-[0_10px_30px_rgba(0,0,0,0.6)]"
-          style={{
-            background: 'linear-gradient(135deg,#FFE066,#FFB800,#FF8C00,#FFE066)',
-            backgroundSize: '300% 300%',
-            animation: 'borderRainbow 4s linear infinite',
-          }}
+    <div className="w-full max-w-md mx-auto flex flex-col items-center select-none pt-1 pb-4">
+      {/* ========================================================= */}
+      {/* 1. TOP HEADER APP BAR                                     */}
+      {/* ========================================================= */}
+      <div className="w-full flex items-center justify-between px-4 pt-1 pb-1">
+        {/* Back Arrow Button */}
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer active:scale-95"
         >
-          <div className="rounded-[22px] bg-gradient-to-b from-[#113829] to-[#0a2319] p-4 text-center border border-amber-300/30">
-            {/* Card Frame */}
-            <div className="relative rounded-2xl bg-gradient-to-b from-[#072518] to-[#03150e] border-2 border-amber-400/40 p-3 overflow-hidden shadow-inner">
-              {/* Corner Ornaments */}
-              <div className="absolute top-1 left-1.5 text-amber-400/40 text-[10px] font-mono">✦</div>
-              <div className="absolute top-1 right-1.5 text-amber-400/40 text-[10px] font-mono">✦</div>
-              <div className="absolute bottom-1 left-1.5 text-amber-400/40 text-[10px] font-mono">✦</div>
-              <div className="absolute bottom-1 right-1.5 text-amber-400/40 text-[10px] font-mono">✦</div>
+          <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
+        </button>
 
-              {/* Card Title Header */}
-              <div className="flex items-center justify-between text-[11px] font-black text-amber-300 tracking-wider mb-2 uppercase px-1">
-                <span>Real Money Card</span>
-                <span className="text-[10px] text-emerald-400 font-mono">100% Free</span>
-              </div>
+        <div className="flex items-center gap-2.5">
+          {/* Niyam (Rules) Button */}
+          <button
+            type="button"
+            onClick={onOpenRules}
+            className="px-3.5 py-1.5 rounded-full bg-amber-100/90 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-black flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
+          >
+            <span className="text-sm">📒</span>
+            <span>Niyam</span>
+          </button>
 
-              {/* Scratch Area Wrapper */}
-              <div className="relative w-full h-[175px] rounded-xl overflow-hidden shadow-inner bg-gradient-to-b from-[#04160d] to-[#010905] border border-amber-400/30">
-                {/* Prize Underneath Layer */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-3 select-none">
-                  <div className="text-amber-300 text-xs font-bold tracking-widest uppercase mb-1 opacity-80">
-                    {sparkle} You Won {sparkle}
-                  </div>
-                  <div className="font-black text-4xl sm:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-[#FFF59D] via-[#FFD700] to-[#FF8F00] drop-shadow-[0_2px_10px_rgba(255,215,0,0.5)]">
-                    {currentPrize.label}
-                  </div>
-                  <div className="text-[11px] text-emerald-300 font-bold mt-1.5 bg-emerald-950/70 px-3 py-0.5 rounded-full border border-emerald-400/30">
-                    ✓ Wallet Mein Add Ho Gaya
-                  </div>
-                </div>
+          {/* Notification Bell with Red Badge */}
+          <button
+            type="button"
+            onClick={onOpenNotifications}
+            className="relative w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer active:scale-95"
+          >
+            <Bell className="w-5 h-5 stroke-[2.2]" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-600 text-white rounded-full text-[11px] font-black flex items-center justify-center shadow-sm border-2 border-white">
+                {unreadNotificationsCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
 
-                {/* HTML5 Scratch Surface Canvas */}
-                <canvas
-                  ref={canvasRef}
-                  className={`absolute inset-0 w-full h-full cursor-pointer z-10 touch-none ${
-                    dailyClaimed ? 'hidden pointer-events-none' : ''
-                  }`}
-                  onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
-                  onMouseMove={(e) => handleMove(e.clientX, e.clientY)}
-                  onMouseUp={handleEnd}
-                  onMouseLeave={handleEnd}
-                  onTouchStart={(e) => {
-                    const t = e.touches[0];
-                    handleStart(t.clientX, t.clientY);
-                  }}
-                  onTouchMove={(e) => {
-                    const t = e.touches[0];
-                    handleMove(t.clientX, t.clientY);
-                  }}
-                  onTouchEnd={handleEnd}
-                />
-              </div>
+      {/* ========================================================= */}
+      {/* 2. STRICTLY CENTERED MAIN HEADING & SUBTITLE              */}
+      {/* ========================================================= */}
+      <div className="w-full text-center my-2 space-y-1">
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-amber-400 text-2xl drop-shadow-[0_2px_4px_rgba(251,191,36,0.5)]">✨</span>
+          <h1 className="text-3xl font-black text-[#0F172A] tracking-tight">Scratch</h1>
+          <span className="text-amber-400 text-2xl drop-shadow-[0_2px_4px_rgba(251,191,36,0.5)]">✨</span>
+        </div>
+        <p className="text-xs text-slate-500 font-medium">
+          Daily 3 free scratch cards ghumayein aur cash jeetein
+        </p>
+      </div>
 
-              {/* Scratch Hint */}
-              {!dailyClaimed && !isRevealed && (
-                <div className="mt-2.5 flex items-center justify-center gap-2 text-white/50 text-[11px] font-medium">
-                  <span style={{ animation: 'handMotion 1s ease-in-out infinite' }} className="text-lg">
-                    ✌️
-                  </span>
-                  <span>Ungli se pura scratch karo</span>
-                  <span style={{ animation: 'handMotion 1s ease-in-out infinite' }} className="text-lg">
-                    ✌️
-                  </span>
-                </div>
-              )}
+      {/* ========================================================= */}
+      {/* 3. LUXURY 3D EMERALD SCRATCH CARD                         */}
+      {/* ========================================================= */}
+      <div className="relative w-[92%] max-w-[325px] mx-auto rounded-[32px] p-4 bg-gradient-to-b from-[#022A1E] via-[#044D37] to-[#011C14] border-2 border-emerald-400/50 shadow-[0_16px_36px_rgba(4,77,55,0.35)] flex flex-col items-center mt-2 mb-2">
+        {/* Floating Confetti Accents */}
+        <div className="absolute top-2 left-3 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+        <div className="absolute top-4 right-3 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-ping delay-200" />
 
-              {/* Progress Bar Row */}
-              {!dailyClaimed && (
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-[#FFD700] to-[#ff6b00] rounded-full transition-all duration-75"
-                      style={{ width: `${scratchedPct}%` }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-amber-300/70 font-bold min-w-[28px] text-right">
-                    {scratchedPct}%
-                  </div>
-                </div>
-              )}
+        {/* Card Header Bar: 👑 REAL MONEY + 100% FREE */}
+        <div className="w-full flex items-center justify-between pb-3 px-1">
+          <div className="flex items-center gap-1.5 text-amber-300 font-black text-xs tracking-wider drop-shadow-xs">
+            <Crown className="w-4 h-4 fill-amber-300 text-amber-400" />
+            <span>REAL MONEY</span>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/40 text-[10px] font-black uppercase tracking-wider shadow-inner">
+            Card #{usedScratches + 1}/3
+          </span>
+        </div>
 
-              {/* Card Footer */}
-              <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10 text-[9px] text-white/30 font-mono tracking-wider">
-                <span>{serial}</span>
-                <span>DAILY RESET: MIDNIGHT</span>
-              </div>
+        {/* Card Scratch Canvas Container with Bevel Inner Border */}
+        <div className="relative w-full h-[190px] rounded-2xl overflow-hidden bg-white shadow-2xl flex items-center justify-center border-2 border-emerald-700/60">
+          {/* Revealed Reward Layer underneath scratch */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-tr from-amber-50 via-yellow-50 to-emerald-50 p-4 text-center">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Aapne Jeeta
+            </span>
+            <div className="text-4xl font-black text-emerald-600 font-mono py-1 drop-shadow-sm">
+              {currentPrize.label}
+            </div>
+            <div className="inline-flex items-center gap-1 text-[11px] text-amber-800 font-bold bg-amber-100/90 px-3 py-1 rounded-full shadow-xs">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Instant Wallet Cash</span>
             </div>
           </div>
-        </div>
 
-        {/* Action Status / Daily Claimed Status */}
-        {dailyClaimed || hasClaimed ? (
-          <div className="relative z-10 w-[290px] mx-auto mt-4 p-4 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-center shadow-lg space-y-1.5">
-            <div className="flex items-center justify-center gap-1.5 text-amber-300 font-black text-sm">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>✓ Aaj Ka Free Scratch Card Claimed (1/1)</span>
+          {/* Canvas Scratch Layer */}
+          {!isOutOfScratches && (
+            <canvas
+              ref={canvasRef}
+              style={{ width: '100%', height: '100%' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              className={`absolute inset-0 w-full h-full touch-none cursor-pointer ${
+                isRevealed ? 'pointer-events-none' : ''
+              }`}
+            />
+          )}
+
+          {/* Already Claimed Watermark */}
+          {isOutOfScratches && (
+            <div className="absolute inset-0 bg-slate-100 flex flex-col items-center justify-center text-center p-4">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-1" />
+              <div className="text-sm font-black text-slate-800">
+                Aaj Ke Sabhi 3 Scratch Cards Claimed!
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Naye 3 cards midnight (12 AM) ko unlock honge.
+              </p>
             </div>
-            <div className="flex items-center justify-center gap-1.5 text-xs text-white/70 font-medium">
-              <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+          )}
+        </div>
+      </div>
+
+      {/* Subtitle Callout: ✌️ Ungli se pura scratch karo ✌️ */}
+      <div className="text-center mt-2 mb-2">
+        <p className="text-xs font-black text-slate-800 flex items-center justify-center gap-1.5">
+          <span className="text-amber-500 text-sm">✌️</span>
+          <span>Ungli se pura scratch karo</span>
+          <span className="text-amber-500 text-sm">✌️</span>
+        </p>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 4. DAILY 3 SCRATCH PROGRESS STATUS CARD                   */}
+      {/* ========================================================= */}
+      <div className="w-[92%] max-w-sm mx-auto mt-1 mb-3">
+        {isOutOfScratches ? (
+          <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm text-center space-y-2">
+            <div className="flex items-center justify-center gap-1.5 text-slate-900 font-black text-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>Aaj Ke Sabhi 3 Free Scratch Cards Claimed (3/3)</span>
+            </div>
+            {/* 3 Completed Card Badges */}
+            <div className="flex items-center justify-center gap-2 pt-0.5">
+              {[1, 2, 3].map((cardNum) => (
+                <span
+                  key={cardNum}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
+                >
+                  <span>✓</span> Card {cardNum}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium pt-0.5">
+              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-pulse" />
               <span>
-                Agla Scratch Card:{' '}
-                <span className="font-mono font-bold text-amber-300">
-                  {midnightTimer || 'Midnight'}
-                </span>{' '}
-                mein unlock hoga
+                Naye 3 Cards:{' '}
+                <strong className="font-mono font-black text-slate-800">
+                  {midnightTimer || '00:00:00'}
+                </strong>{' '}
+                mein unlock honge
               </span>
             </div>
           </div>
         ) : (
-          <div
-            className="relative z-10 w-[290px] mx-auto mt-4 rounded-2xl p-[3px] shadow-[0_0_20px_rgba(255,165,0,0.4)]"
-            style={{
-              background: 'linear-gradient(135deg,#FFD700,#ff6b00,#ff0080,#FFD700)',
-              backgroundSize: '300% 300%',
-              animation: 'borderRainbow 2.5s linear infinite',
-            }}
-          >
-            <div className="w-full py-3 rounded-[13px] bg-gradient-to-b from-[#e65c00] via-[#b83200] to-[#8a1f00] text-white font-black text-sm tracking-wide text-center shadow-lg">
-              ✨ Scratch The Card Above
+          <div className="p-3.5 rounded-2xl bg-white border border-emerald-200 shadow-sm text-center space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-1.5 text-emerald-800 font-black text-sm">
+                <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Aaj Ke Free Scratch Cards ({freeScratchesLeft}/{totalDailyScratches} Baaki)</span>
+              </div>
+              <span className="text-[11px] font-black font-mono text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                {freeScratchesLeft} Left
+              </span>
+            </div>
+
+            {/* 3 Step Progress Indicators */}
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3].map((cardNum) => {
+                const isClaimed = cardNum <= usedScratches;
+                const isCurrent = cardNum === usedScratches + 1;
+                return (
+                  <div
+                    key={cardNum}
+                    className={`py-1.5 px-2 rounded-xl text-xs font-bold text-center border transition-all ${
+                      isClaimed
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : isCurrent
+                        ? 'bg-gradient-to-r from-amber-50 to-emerald-50 border-emerald-500 text-emerald-900 shadow-xs ring-2 ring-emerald-400/30'
+                        : 'bg-slate-50 border-slate-200 text-slate-400'
+                    }`}
+                  >
+                    {isClaimed ? `✓ Card ${cardNum}` : isCurrent ? `🎯 Card ${cardNum}` : `Card ${cardNum}`}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="text-[11px] text-slate-500 font-medium">
+              Ungli se Card #{usedScratches + 1} pura scratch karein
             </div>
           </div>
         )}
-
-        {/* Tagline */}
-        <p className="relative z-10 text-white/40 text-[11px] mt-3 leading-relaxed">
-          Daily Strictly 1 Free Scratch Card Only • Instant UPI Cash
-        </p>
       </div>
+
+      {/* ========================================================= */}
+      {/* 5. GLOWING VIBRANT SPRING GREEN ACTION BUTTON             */}
+      {/* ========================================================= */}
+      <div className="w-[92%] max-w-sm mx-auto mb-3">
+        <button
+          type="button"
+          onClick={handleAutoScratch}
+          disabled={isRevealed || isOutOfScratches}
+          className={`w-full py-4 px-6 rounded-full font-black text-base transition-all flex items-center justify-between shadow-xl cursor-pointer active:scale-98 ${
+            isRevealed || isOutOfScratches
+              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border border-slate-300'
+              : 'bg-gradient-to-r from-[#00E676] via-[#00C853] to-[#009624] text-white shadow-[0_10px_28px_rgba(0,200,83,0.45)] hover:shadow-[0_12px_32px_rgba(0,200,83,0.55)]'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-mono font-black text-lg">///</span>
+          </div>
+          <span className="tracking-wide font-black">
+            {isRevealed
+              ? 'Card Scratched ✓'
+              : isOutOfScratches
+              ? 'All 3 Cards Claimed Today ✓'
+              : `Scratch The Card (${freeScratchesLeft}/3 Left)`}
+          </span>
+          <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+        </button>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 6. FOOTER TRUST BADGE CAPSULE                             */}
+      {/* ========================================================= */}
+      <div className="w-[92%] max-w-sm mx-auto">
+        <div className="py-2.5 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center gap-3">
+          <span className="flex items-center gap-1 text-emerald-700">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>100% Secure</span>
+          </span>
+          <span className="text-slate-300">•</span>
+          <span>Daily 3 Free Scratch Cards</span>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* RESULT CELEBRATION MODAL                                  */}
+      {/* ========================================================= */}
+      {showResultModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white border-2 border-emerald-400 rounded-3xl p-7 text-center shadow-2xl max-w-xs w-full space-y-3 animate-zoom-in">
+            <div className="text-5xl">🎁</div>
+            <div className="space-y-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                Badhai Ho!
+              </span>
+              <h3 className="text-base font-black text-slate-900 pt-1">
+                Scratch Card Me Jeeta
+              </h3>
+              <div className="text-5xl font-black text-emerald-600 py-1 font-mono">
+                {currentPrize.label}
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                {freeScratchesLeft - 1 > 0
+                  ? `Wallet me credit ho gaya! (${freeScratchesLeft - 1} cards abhi baaki hain)`
+                  : 'Wallet me instant credit ho gaya! Aaj ke 3 scratch cards pure ho gaye.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClaim}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-sm shadow-md cursor-pointer active:scale-95 transition-all"
+            >
+              {freeScratchesLeft - 1 > 0
+                ? `Claim & Next Card (${freeScratchesLeft - 1} Left) ›`
+                : 'Claim & Collect Cash ✓'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,10 +1,24 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Sparkles, Clock, CheckCircle2 } from 'lucide-react';
+import {
+  Clock,
+  CheckCircle2,
+  ArrowLeft,
+  Bell,
+  ChevronRight,
+  ShieldCheck,
+  Disc,
+  Sparkles,
+} from 'lucide-react';
 
 interface SpinWheelProps {
   freeSpinsLeft?: number;
+  totalDailySpins?: number;
   dailyClaimed: boolean;
   onRewardWon: (amount: number) => void;
+  onBack?: () => void;
+  onOpenRules?: () => void;
+  onOpenNotifications?: () => void;
+  unreadNotificationsCount?: number;
 }
 
 interface Segment {
@@ -13,20 +27,104 @@ interface Segment {
   c1: string;
   c2: string;
   c3: string;
+  coinCount: number;
 }
 
+// 8 Segments matching high quality 3D wheel design
 const SEGS: Segment[] = [
-  { label: '₹1.00', value: 1.0, c1: '#F5C518', c2: '#C89000', c3: '#8a6000' },
-  { label: '₹0.50', value: 0.50, c1: '#CE93D8', c2: '#8E24AA', c3: '#4A0072' },
-  { label: '₹0.35', value: 0.35, c1: '#F97316', c2: '#C2410C', c3: '#7c2d00' },
-  { label: '₹0.25', value: 0.25, c1: '#2DD4BF', c2: '#0F766E', c3: '#134e4a' },
-  { label: '₹0.10', value: 0.10, c1: '#F472B6', c2: '#BE185D', c3: '#831843' },
-  { label: '₹0.25', value: 0.25, c1: '#60A5FA', c2: '#1D4ED8', c3: '#1e3a8a' },
-  { label: '₹0.15', value: 0.15, c1: '#4ADE80', c2: '#15803D', c3: '#14532d' },
-  { label: '₹0.35', value: 0.35, c1: '#F5C518', c2: '#C89000', c3: '#8a6000' },
+  { label: '₹0.25', value: 0.25, c1: '#00D4FF', c2: '#0088FF', c3: '#0044BB', coinCount: 3 }, // Cyan / Blue
+  { label: '₹0.15', value: 0.15, c1: '#34E885', c2: '#08B854', c3: '#03682C', coinCount: 3 }, // Lime Green
+  { label: '₹0.35', value: 0.35, c1: '#FFC107', c2: '#FF9100', c3: '#E65100', coinCount: 3 }, // Amber / Gold
+  { label: '₹1.00', value: 1.00, c1: '#FF5252', c2: '#E53935', c3: '#B71C1C', coinCount: 4 }, // Big Winner Red
+  { label: '₹0.50', value: 0.50, c1: '#E040FB', c2: '#AA00FF', c3: '#6A0080', coinCount: 3 }, // Purple / Magenta
+  { label: '₹0.35', value: 0.35, c1: '#FF6E40', c2: '#FF3D00', c3: '#BF360C', coinCount: 3 }, // Vibrant Orange
+  { label: '₹0.25', value: 0.25, c1: '#40C4FF', c2: '#0091EA', c3: '#01579B', coinCount: 3 }, // Sky Blue
+  { label: '₹0.10', value: 0.10, c1: '#FF4081', c2: '#F50057', c3: '#880E4F', coinCount: 2 }, // Vivid Pink
 ];
 
-export const SpinWheel: React.FC<SpinWheelProps> = ({ dailyClaimed, onRewardWon }) => {
+// Photorealistic 3D Cylindrical Podium Base with Multi-Layered Floor & Platform Shadows
+const Realistic3DPodium = () => (
+  <div className="relative w-[340px] flex flex-col items-center pointer-events-none -mt-4 z-0">
+    <svg width="340" height="110" viewBox="0 0 340 110" fill="none" className="overflow-visible">
+      <defs>
+        {/* Top Disc Platinum Gradient */}
+        <linearGradient id="podiumTop" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="45%" stopColor="#F8FAFC" />
+          <stop offset="100%" stopColor="#E2E8F0" />
+        </linearGradient>
+
+        {/* Upper Cylinder Wall with Chrome Lighting */}
+        <linearGradient id="podiumWallUpper" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#94A3B8" />
+          <stop offset="25%" stopColor="#E2E8F0" />
+          <stop offset="50%" stopColor="#FFFFFF" />
+          <stop offset="75%" stopColor="#E2E8F0" />
+          <stop offset="100%" stopColor="#64748B" />
+        </linearGradient>
+
+        {/* Lower Step Disc */}
+        <linearGradient id="podiumLowerDisc" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="60%" stopColor="#F1F5F9" />
+          <stop offset="100%" stopColor="#CBD5E1" />
+        </linearGradient>
+
+        {/* Lower Base Wall */}
+        <linearGradient id="podiumWallLower" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#64748B" />
+          <stop offset="30%" stopColor="#CBD5E1" />
+          <stop offset="50%" stopColor="#F8FAFC" />
+          <stop offset="70%" stopColor="#CBD5E1" />
+          <stop offset="100%" stopColor="#475569" />
+        </linearGradient>
+
+        {/* Deep Diffused Floor Shadow under podium */}
+        <radialGradient id="floorShadow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="rgba(15,23,42,0.32)" />
+          <stop offset="50%" stopColor="rgba(15,23,42,0.12)" />
+          <stop offset="100%" stopColor="rgba(15,23,42,0)" />
+        </radialGradient>
+
+        {/* Top Platform Wheel Drop Shadow */}
+        <radialGradient id="wheelOnPodiumShadow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="rgba(0,0,0,0.55)" />
+          <stop offset="45%" stopColor="rgba(0,0,0,0.22)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+        </radialGradient>
+      </defs>
+
+      {/* 1. Deep Floor Shadow under the entire podium */}
+      <ellipse cx="170" cy="94" rx="160" ry="16" fill="url(#floorShadow)" />
+
+      {/* 2. Lower Step Cylinder Body */}
+      <path d="M 14 58 C 14 58, 14 80, 14 80 C 14 94, 326 94, 326 80 L 326 58 Z" fill="url(#podiumWallLower)" />
+      {/* Lower Step Top Rim */}
+      <ellipse cx="170" cy="58" rx="156" ry="20" fill="url(#podiumLowerDisc)" stroke="#E2E8F0" strokeWidth="1" />
+
+      {/* 3. Upper Main Cylinder Body */}
+      <path d="M 32 24 C 32 24, 32 58, 32 58 C 32 72, 308 72, 308 58 L 308 24 Z" fill="url(#podiumWallUpper)" />
+      {/* Upper Main Top Platform Surface */}
+      <ellipse cx="170" cy="24" rx="138" ry="18" fill="url(#podiumTop)" stroke="#FFFFFF" strokeWidth="2.5" />
+      {/* Inner Bevel Ring Highlight */}
+      <ellipse cx="170" cy="24" rx="130" ry="15" fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth="1.5" />
+
+      {/* 4. Realistic Wheel Shadow on Podium Platform */}
+      <ellipse cx="170" cy="24" rx="100" ry="11" fill="url(#wheelOnPodiumShadow)" />
+    </svg>
+  </div>
+);
+
+export const SpinWheel: React.FC<SpinWheelProps> = ({
+  freeSpinsLeft = 3,
+  totalDailySpins = 3,
+  dailyClaimed,
+  onRewardWon,
+  onBack,
+  onOpenRules,
+  onOpenNotifications,
+  unreadNotificationsCount = 6,
+}) => {
   const [isSpinning, setIsSpinning] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
   const [wonSegment, setWonSegment] = useState<Segment | null>(null);
@@ -40,9 +138,11 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({ dailyClaimed, onRewardWon 
 
   const N = SEGS.length;
   const PI2 = Math.PI * 2;
-  const WS = 290;
+  const WS = 320;
   const WC = WS / 2;
-  const WR = 132;
+  const WR = 144;
+
+  const isOutOfSpins = freeSpinsLeft <= 0 || dailyClaimed;
 
   // Live Countdown to Midnight (00:00:00)
   useEffect(() => {
@@ -68,438 +168,589 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({ dailyClaimed, onRewardWon 
     return () => clearInterval(interval);
   }, []);
 
-  // Web Audio Context Helper
-  const getAudioContext = useCallback(() => {
-    if (!audioCtxRef.current) {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        audioCtxRef.current = new AudioCtx();
-      }
-    }
-    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume();
-    }
-    return audioCtxRef.current;
-  }, []);
-
-  const playWheelTick = useCallback(() => {
+  // Web Audio Synthesis for Tick and Win sounds
+  const playWheelTick = () => {
     try {
-      const ac = getAudioContext();
-      if (!ac) return;
-      const t = ac.currentTime;
-      const o = ac.createOscillator();
-      const g = ac.createGain();
-      o.connect(g);
-      g.connect(ac.destination);
-      o.type = 'sine';
-      o.frequency.setValueAtTime(320, t);
-      g.gain.setValueAtTime(0.12, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-      o.start(t);
-      o.stop(t + 0.06);
+      const ctx = audioCtxRef.current || new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(650, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.04);
+
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.04);
     } catch {
-      // Audio autoplay policy fallback
+      // Ignore audio failure
     }
-  }, [getAudioContext]);
+  };
 
-  const playWinJingle = useCallback(() => {
+  const playWinJingle = () => {
     try {
-      const ac = getAudioContext();
-      if (!ac) return;
-      const notes: [number, number][] = [
-        [523.25, 0],
-        [659.25, 0.13],
-        [783.99, 0.26],
-        [1046.5, 0.39],
-        [1318.5, 0.52],
-      ];
-      notes.forEach(([f, d]) => {
-        const o = ac.createOscillator();
-        const g = ac.createGain();
-        const b = ac.currentTime + d;
-        o.connect(g);
-        g.connect(ac.destination);
-        o.type = 'triangle';
-        o.frequency.setValueAtTime(f, b);
-        g.gain.setValueAtTime(0, b);
-        g.gain.linearRampToValueAtTime(0.22, b + 0.03);
-        g.gain.exponentialRampToValueAtTime(0.001, b + 0.45);
-        o.start(b);
-        o.stop(b + 0.5);
+      const ctx = audioCtxRef.current || new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.1);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + idx * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.1 + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.1);
+        osc.stop(ctx.currentTime + idx * 0.1 + 0.35);
       });
     } catch {
-      // Ignore
+      // Ignore audio failure
     }
-  }, [getAudioContext]);
-
-  // Helper drawing functions
-  const drawCoin = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number) => {
-    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-    g.addColorStop(0, '#FFF5B0');
-    g.addColorStop(0.4, '#FFD700');
-    g.addColorStop(0.75, '#C8960A');
-    g.addColorStop(1, '#7a5800');
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, PI2);
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
   };
 
-  const drawStar = (ctx: CanvasRenderingContext2D, x: number, y: number, pts: number, or: number, ir: number) => {
-    ctx.beginPath();
-    for (let i = 0; i < pts * 2; i++) {
-      const r = i % 2 === 0 ? or : ir;
-      const a = (i * Math.PI) / pts - Math.PI / 2;
-      if (i === 0) ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
-      else ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(180,120,0,0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  };
+  // Canvas Drawing with High DPI / Retina Support
+  const drawWheel = useCallback(
+    (angle: number) => {
+      const cvs = canvasRef.current;
+      if (!cvs) return;
+      const dpr = window.devicePixelRatio || 1;
+      if (cvs.width !== WS * dpr || cvs.height !== WS * dpr) {
+        cvs.width = WS * dpr;
+        cvs.height = WS * dpr;
+      }
+      const wx = cvs.getContext('2d');
+      if (!wx) return;
 
-  const drawWheel = useCallback((angle: number) => {
-    const cv = canvasRef.current;
-    if (!cv) return;
-    const wx = cv.getContext('2d');
-    if (!wx) return;
+      wx.save();
+      // Explicitly set transform so it never accumulates across animation frames
+      wx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      wx.clearRect(0, 0, WS, WS);
 
-    wx.clearRect(0, 0, WS, WS);
-    const sA = PI2 / N;
+      const sA = PI2 / N;
 
-    // Outer Shadow
-    wx.save();
-    wx.beginPath();
-    wx.arc(WC, WC, WR + 14, 0, PI2);
-    wx.fillStyle = 'rgba(0,0,0,0.3)';
-    wx.fill();
-    wx.restore();
+      // 1. Outer Deep Drop Shadow
+      wx.save();
+      wx.beginPath();
+      wx.arc(WC, WC, WR + 12, 0, PI2);
+      wx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+      wx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      wx.shadowBlur = 20;
+      wx.shadowOffsetY = 12;
+      wx.fill();
+      wx.restore();
 
-    // Outer Gold Ring 1 (Dark Gold)
-    const g1 = wx.createLinearGradient(0, 0, WS, WS);
-    g1.addColorStop(0, '#A07000');
-    g1.addColorStop(0.5, '#FFD700');
-    g1.addColorStop(1, '#6B4500');
-    wx.beginPath();
-    wx.arc(WC, WC, WR + 13, 0, PI2);
-    wx.fillStyle = g1;
-    wx.fill();
-
-    // Outer Ring 2 (Bevel Highlight)
-    const g2 = wx.createLinearGradient(0, 0, WS, WS);
-    g2.addColorStop(0, '#FFE875');
-    g2.addColorStop(0.5, '#C89000');
-    g2.addColorStop(1, '#FFD700');
-    wx.beginPath();
-    wx.arc(WC, WC, WR + 10, 0, PI2);
-    wx.fillStyle = g2;
-    wx.fill();
-
-    // Outer Ring 3 (Inner Groove)
-    wx.beginPath();
-    wx.arc(WC, WC, WR + 3, 0, PI2);
-    wx.fillStyle = '#1c0c00';
-    wx.fill();
-
-    // Wheel Disc Background
-    wx.beginPath();
-    wx.arc(WC, WC, WR, 0, PI2);
-    wx.fillStyle = '#111';
-    wx.fill();
-
-    // Draw Segments
-    for (let i = 0; i < N; i++) {
-      const a1 = angle + i * sA;
-      const a2 = a1 + sA;
-      const seg = SEGS[i];
+      // 2. Outer 3D Gold Beveled Bezel Ring
+      const outerGold = wx.createLinearGradient(0, 0, WS, WS);
+      outerGold.addColorStop(0, '#FFE873');
+      outerGold.addColorStop(0.2, '#FFD700');
+      outerGold.addColorStop(0.5, '#C47A00');
+      outerGold.addColorStop(0.8, '#FFD700');
+      outerGold.addColorStop(1, '#5C3400');
 
       wx.save();
       wx.beginPath();
-      wx.moveTo(WC, WC);
-      wx.arc(WC, WC, WR, a1, a2);
-      wx.closePath();
-
-      const sg = wx.createRadialGradient(WC, WC, 15, WC, WC, WR);
-      sg.addColorStop(0, seg.c1);
-      sg.addColorStop(0.7, seg.c2);
-      sg.addColorStop(1, seg.c3);
-      wx.fillStyle = sg;
+      wx.arc(WC, WC, WR + 10, 0, PI2);
+      wx.fillStyle = outerGold;
       wx.fill();
 
-      wx.strokeStyle = 'rgba(255,255,255,0.45)';
-      wx.lineWidth = 1.5;
-      wx.stroke();
-      wx.restore();
-
-      // Divider Line
-      wx.save();
+      // Gold inner lip
       wx.beginPath();
-      wx.moveTo(WC, WC);
-      wx.lineTo(WC + Math.cos(a1) * WR, WC + Math.sin(a1) * WR);
-      wx.strokeStyle = 'rgba(0,0,0,0.35)';
-      wx.lineWidth = 1.5;
-      wx.stroke();
+      wx.arc(WC, WC, WR + 2, 0, PI2);
+      wx.fillStyle = '#4A2A00';
+      wx.fill();
       wx.restore();
 
-      // Label Text & Indian Rupee Coin
-      const midA = a1 + sA / 2;
+      // 3. Wheel Rotating Segments
       wx.save();
       wx.translate(WC, WC);
-      wx.rotate(midA);
-      wx.textAlign = 'right';
-      wx.textBaseline = 'middle';
+      wx.rotate(angle);
 
-      // Drop Shadow for text
-      wx.shadowColor = 'rgba(0,0,0,0.7)';
-      wx.shadowBlur = 4;
-      wx.shadowOffsetX = 1;
-      wx.shadowOffsetY = 1;
+      SEGS.forEach((seg, i) => {
+        const start = i * sA;
+        const end = start + sA;
+        const mid = start + sA / 2;
 
-      wx.font = '900 13px system-ui, sans-serif';
-      wx.fillStyle = '#FFFFFF';
-      wx.fillText(seg.label, WR - 22, 0);
+        // Slice Body with Gradient
+        wx.save();
+        wx.beginPath();
+        wx.moveTo(0, 0);
+        wx.arc(0, 0, WR, start, end);
+        wx.closePath();
 
-      wx.shadowColor = 'transparent';
-      drawCoin(wx, WR - 10, 0, 5.5);
+        const grad = wx.createRadialGradient(0, 0, 10, 0, 0, WR);
+        grad.addColorStop(0, seg.c1);
+        grad.addColorStop(0.65, seg.c2);
+        grad.addColorStop(1, seg.c3);
+        wx.fillStyle = grad;
+        wx.fill();
+
+        // Slice Divider Line (Gold)
+        wx.strokeStyle = '#FFEAA7';
+        wx.lineWidth = 2;
+        wx.stroke();
+        wx.restore();
+
+        // Slice Content (Rupee Value & Coin Stack)
+        wx.save();
+        wx.rotate(mid);
+
+        // Value Label (Large, Bold, Crisp White with Dark Shadow)
+        wx.save();
+        wx.fillStyle = '#FFFFFF';
+        wx.font = '900 18px system-ui, -apple-system, sans-serif';
+        wx.textAlign = 'center';
+        wx.textBaseline = 'middle';
+        wx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        wx.shadowBlur = 4;
+        wx.shadowOffsetY = 2;
+        wx.fillText(seg.label, WR * 0.72, 0);
+        wx.restore();
+
+        // 3D Gold Coin Badge in slice
+        wx.save();
+        const coinDist = WR * 0.42;
+        wx.translate(coinDist, 0);
+
+        // Gold coin body
+        const coinGrad = wx.createRadialGradient(-2, -2, 1, 0, 0, 11);
+        coinGrad.addColorStop(0, '#FFF59D');
+        coinGrad.addColorStop(0.4, '#FFD700');
+        coinGrad.addColorStop(0.8, '#E67E22');
+        coinGrad.addColorStop(1, '#964B00');
+
+        wx.beginPath();
+        wx.arc(0, 0, 10.5, 0, PI2);
+        wx.fillStyle = coinGrad;
+        wx.shadowColor = 'rgba(0,0,0,0.45)';
+        wx.shadowBlur = 4;
+        wx.shadowOffsetY = 2;
+        wx.fill();
+        wx.strokeStyle = '#FFFFFF';
+        wx.lineWidth = 1;
+        wx.stroke();
+
+        // Rupee Symbol on coin
+        wx.fillStyle = '#5C2D00';
+        wx.font = '900 11px system-ui, sans-serif';
+        wx.textAlign = 'center';
+        wx.textBaseline = 'middle';
+        wx.shadowBlur = 0;
+        wx.fillText('₹', 0, 0.5);
+
+        wx.restore();
+
+        wx.restore();
+      });
+
+      // Chrome Rim Screws / Studs around perimeter
+      for (let i = 0; i < N * 2; i++) {
+        const studA = (i * PI2) / (N * 2);
+        const sx = Math.cos(studA) * (WR + 6);
+        const sy = Math.sin(studA) * (WR + 6);
+
+        wx.beginPath();
+        wx.arc(sx, sy, 2.4, 0, PI2);
+        wx.fillStyle = '#FFFFFF';
+        wx.shadowColor = 'rgba(0,0,0,0.5)';
+        wx.shadowBlur = 2;
+        wx.fill();
+      }
+
+      wx.restore(); // Restore from rotation
+
+      // 4. Center 3D Golden Hub Cap with Star
+      const centerGold = wx.createRadialGradient(WC - 5, WC - 5, 2, WC, WC, 32);
+      centerGold.addColorStop(0, '#FFF9A6');
+      centerGold.addColorStop(0.3, '#FFD700');
+      centerGold.addColorStop(0.7, '#C47A00');
+      centerGold.addColorStop(1, '#5C3400');
+
+      wx.save();
+      wx.beginPath();
+      wx.arc(WC, WC, 30, 0, PI2);
+      wx.fillStyle = centerGold;
+      wx.shadowColor = 'rgba(0,0,0,0.45)';
+      wx.shadowBlur = 10;
+      wx.shadowOffsetY = 4;
+      wx.fill();
+      wx.strokeStyle = '#FFFFFF';
+      wx.lineWidth = 3;
+      wx.stroke();
       wx.restore();
-    }
 
-    // Glass shine overlay
-    wx.save();
-    wx.translate(WC, WC);
-    const shine = wx.createLinearGradient(-WR, -WR, WR, WR);
-    shine.addColorStop(0, 'rgba(255,255,255,0.18)');
-    shine.addColorStop(0.4, 'rgba(255,255,255,0.05)');
-    shine.addColorStop(0.6, 'rgba(255,255,255,0)');
-    shine.addColorStop(1, 'rgba(0,0,0,0.15)');
-    wx.beginPath();
-    wx.arc(0, 0, WR, 0, PI2);
-    wx.fillStyle = shine;
-    wx.fill();
-    wx.restore();
+      // Embossed 3D White Star in Center
+      wx.save();
+      wx.translate(WC, WC);
+      wx.beginPath();
+      for (let i = 0; i < 5 * 2; i++) {
+        const r = i % 2 === 0 ? 15 : 7;
+        const a = (i * Math.PI) / 5 - Math.PI / 2;
+        if (i === 0) wx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+        else wx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      wx.closePath();
+      wx.fillStyle = '#FFFFFF';
+      wx.shadowColor = 'rgba(0,0,0,0.3)';
+      wx.shadowBlur = 4;
+      wx.fill();
 
-    // Perimeter Gold Stud Coins
-    for (let i = 0; i < N; i++) {
-      const mA = angle + i * sA + sA / 2 - Math.PI / 2;
-      drawCoin(wx, WC + Math.cos(mA) * (WR + 6), WC + Math.sin(mA) * (WR + 6), 8.5);
-    }
+      wx.strokeStyle = '#EAB308';
+      wx.lineWidth = 1.2;
+      wx.stroke();
+      wx.restore();
 
-    // Center Gold Hub with 5-point Star
-    const hub = wx.createRadialGradient(WC - 10, WC - 12, 2, WC, WC, 34);
-    hub.addColorStop(0, '#FFF5B0');
-    hub.addColorStop(0.3, '#FFD700');
-    hub.addColorStop(0.7, '#B8860B');
-    hub.addColorStop(1, '#5a3e00');
-    wx.beginPath();
-    wx.arc(WC, WC, 34, 0, PI2);
-    wx.fillStyle = hub;
-    wx.fill();
-    wx.beginPath();
-    wx.arc(WC, WC, 34, 0, PI2);
-    wx.strokeStyle = 'rgba(0,0,0,0.35)';
-    wx.lineWidth = 2;
-    wx.stroke();
-
-    wx.save();
-    wx.translate(WC, WC);
-    drawStar(wx, 0, 0, 5, 20, 9);
-    wx.restore();
-  }, [N, PI2, WC, WR, WS]);
+      // RESTORE OUTERMOST CANVAS CONTEXT
+      wx.restore();
+    },
+    [N, PI2, WC, WR, WS]
+  );
 
   useEffect(() => {
-    drawWheel(0);
+    drawWheel(wheelAngleRef.current);
   }, [drawWheel]);
 
   const doSpin = () => {
-    if (isSpinningRef.current || dailyClaimed) return;
-    isSpinningRef.current = true;
+    if (isSpinning || isOutOfSpins || isSpinningRef.current) return;
     setIsSpinning(true);
+    isSpinningRef.current = true;
 
-    const ti = Math.floor(Math.random() * N);
+    // Pick winning segment
+    const winIdx = Math.floor(Math.random() * N);
+    const targetSeg = SEGS[winIdx];
+
     const sA = PI2 / N;
-    const tA = (7 + Math.random() * 5) * PI2 + (PI2 - (ti * sA + sA / 2));
-    const dur = 5200;
-    const t0 = performance.now();
-    const a0 = wheelAngleRef.current;
-    let ls = -1;
+    const targetA = (3 * Math.PI) / 2 - winIdx * sA - sA / 2;
+    const extraTurns = 5 + Math.floor(Math.random() * 3);
+    const totalA = extraTurns * PI2 + targetA;
 
-    const ease = (t: number) => 1 - Math.pow(1 - t, 4);
+    const startA = wheelAngleRef.current % PI2;
+    const diff = totalA - startA;
+    const dur = 4200;
+    const startTime = performance.now();
+    let lastTickIdx = -1;
 
-    const frame = (now: number) => {
-      const t = Math.min((now - t0) / dur, 1);
-      wheelAngleRef.current = a0 + tA * ease(t);
-      drawWheel(wheelAngleRef.current);
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3.5);
 
-      const norm = ((-wheelAngleRef.current % PI2) + PI2) % PI2;
-      const si = Math.floor(((norm + Math.PI / 2) % PI2) / sA) % N;
+    const animate = (now: number) => {
+      const el = now - startTime;
+      const p = Math.min(el / dur, 1);
+      const curA = startA + diff * easeOutCubic(p);
+      wheelAngleRef.current = curA;
+      drawWheel(curA);
 
-      if (si !== ls && t < 0.96) {
+      const tickIdx = Math.floor((curA / sA) % N);
+      if (tickIdx !== lastTickIdx && p < 0.95) {
+        lastTickIdx = tickIdx;
         playWheelTick();
-        ls = si;
       }
 
-      if (t < 1) {
-        requestAnimationFrame(frame);
+      if (p < 1) {
+        requestAnimationFrame(animate);
       } else {
-        isSpinningRef.current = false;
         setIsSpinning(false);
-        playWinJingle();
-
-        const emos = ['🎉', '💰', '🤑', '✨', '🎊'];
-        setResEmoji(emos[Math.floor(Math.random() * emos.length)]);
-        setWonSegment(SEGS[ti]);
+        isSpinningRef.current = false;
+        setWonSegment(targetSeg);
+        setResEmoji(targetSeg.value >= 0.5 ? '🎉' : '⭐');
         setShowResultModal(true);
+        playWinJingle();
       }
     };
 
-    requestAnimationFrame(frame);
+    requestAnimationFrame(animate);
   };
 
   const handleClaim = () => {
-    setShowResultModal(false);
     if (wonSegment) {
       onRewardWon(wonSegment.value);
     }
+    setShowResultModal(false);
   };
 
+  const usedSpins = totalDailySpins - freeSpinsLeft;
+
   return (
-    <div className="w-full flex justify-center py-2 animate-fade-in select-none">
-      <style>{`
-        @keyframes borderRainbowSpin {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-      `}</style>
+    <div className="w-full max-w-md mx-auto flex flex-col items-center select-none pt-1 pb-4">
+      {/* ========================================================= */}
+      {/* 1. TOP HEADER APP BAR (Back, Niyam Capsule & Bell)         */}
+      {/* ========================================================= */}
+      <div className="w-full flex items-center justify-between px-4 pt-1 pb-1">
+        {/* Back Arrow Button */}
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer active:scale-95"
+        >
+          <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
+        </button>
 
-      {/* Main Container matching Lucky Spin Wheel wrap */}
-      <div className="relative w-full max-w-[400px] rounded-3xl p-5 text-center overflow-hidden bg-gradient-to-b from-[#0a3d2b] to-[#051f17] border border-amber-400/25 shadow-2xl">
-        {/* Result Overlay Modal */}
-        {showResultModal && wonSegment && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center z-50 gap-4 p-4 animate-fade-in">
-            <div className="bg-gradient-to-br from-[#0e5438] to-[#083320] border-[2.5px] border-[#FFD700] rounded-3xl px-8 py-7 text-center shadow-[0_0_40px_rgba(255,215,0,0.3)] max-w-xs w-full">
-              <div className="text-5xl mb-2">{resEmoji}</div>
-              <div className="text-white/80 text-sm mb-1 font-semibold">Badhai ho! Aapne jeeta</div>
-              <div className="text-[#FFD700] text-5xl font-black mb-1 drop-shadow-md">{wonSegment.label}</div>
-              <div className="text-white/50 text-xs">Wallet mein instant add ho jayega</div>
-            </div>
-            <button
-              type="button"
-              onClick={handleClaim}
-              className="bg-gradient-to-b from-[#FFE566] to-[#FFB800] hover:from-[#FFF090] hover:to-[#FFC820] text-[#2a1500] font-black text-base px-9 py-3.5 rounded-2xl cursor-pointer shadow-lg active:scale-95 transition-transform"
-            >
-              Claim Karo!
-            </button>
-          </div>
-        )}
-
-        {/* Top Badge */}
-        <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-300 text-xs font-bold mb-3 tracking-wide shadow-xs">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>Daily 1 Free Spin Only • Real Cash</span>
-        </div>
-
-        {/* Ribbon */}
-        <div className="mb-3">
-          <span
-            className="inline-block text-white text-sm font-extrabold px-9 py-1.5 shadow-md"
-            style={{
-              background: 'linear-gradient(135deg,#c42020,#ff3333,#c42020)',
-              clipPath: 'polygon(8px 0%, calc(100% - 8px) 0%, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0% 50%)',
-              textShadow: '0 1px 3px rgba(0,0,0,0.5)',
-            }}
+        <div className="flex items-center gap-2.5">
+          {/* Niyam (Rules) Button */}
+          <button
+            type="button"
+            onClick={onOpenRules}
+            className="px-3.5 py-1.5 rounded-full bg-amber-100/90 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-black flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
           >
-            Lucky Fortune Wheel!
-          </span>
+            <span className="text-sm">📒</span>
+            <span>Niyam</span>
+          </button>
+
+          {/* Notification Bell with Red Badge */}
+          <button
+            type="button"
+            onClick={onOpenNotifications}
+            className="relative w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer active:scale-95"
+          >
+            <Bell className="w-5 h-5 stroke-[2.2]" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-600 text-white rounded-full text-[11px] font-black flex items-center justify-center shadow-sm border-2 border-white">
+                {unreadNotificationsCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 2. STRICTLY CENTERED MAIN HEADING & SUBTITLE              */}
+      {/* ========================================================= */}
+      <div className="w-full text-center my-2 space-y-1">
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-amber-400 text-2xl drop-shadow-[0_2px_4px_rgba(251,191,36,0.5)]">✨</span>
+          <h1 className="text-3xl font-black text-[#0F172A] tracking-tight">Spin</h1>
+          <span className="text-amber-400 text-2xl drop-shadow-[0_2px_4px_rgba(251,191,36,0.5)]">✨</span>
+        </div>
+        <p className="text-xs text-slate-500 font-medium">
+          Daily 3 free spins ghumayein aur cash jeetein
+        </p>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 3. 3D PODIUM & ELEVATED WHEEL (CLEAN & NO CORNER COINS)    */}
+      {/* ========================================================= */}
+      <div className="relative w-full max-w-[360px] flex flex-col items-center mt-3 mb-2">
+        {/* ======================================================= */}
+        {/* MULTI-COLORED CELEBRATORY CONFETTI DOTS AROUND WHEEL    */}
+        {/* ======================================================= */}
+        {/* Cyan Dots & Diamonds */}
+        <div className="absolute top-4 left-18 w-2.5 h-2.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF] opacity-90 animate-pulse" />
+        <div className="absolute top-24 left-8 w-2 h-2 bg-[#00D2FF] rotate-45 shadow-[0_0_6px_#00D2FF] opacity-85" />
+        <div className="absolute bottom-22 right-12 w-2.5 h-2.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF] opacity-90" />
+
+        {/* Neon Pink Dots & Diamonds */}
+        <div className="absolute top-6 right-18 w-2.5 h-2.5 rounded-full bg-[#FF2A6D] shadow-[0_0_8px_#FF2A6D] opacity-90 animate-pulse delay-100" />
+        <div className="absolute top-26 right-8 w-2 h-2 bg-[#FF1744] rotate-45 opacity-85 shadow-[0_0_6px_#FF1744]" />
+        <div className="absolute bottom-18 left-14 w-2.5 h-2.5 bg-[#FF0055] rotate-12 opacity-85" />
+
+        {/* Lime Green Dots */}
+        <div className="absolute top-16 left-9 w-2 h-2 rounded-full bg-[#00E676] shadow-[0_0_6px_#00E676] opacity-90" />
+        <div className="absolute top-18 right-10 w-2 h-2 rounded-full bg-[#00E676] shadow-[0_0_6px_#00E676] opacity-90" />
+        <div className="absolute bottom-26 right-8 w-2 h-2 bg-[#00FF66] rotate-45 opacity-85" />
+
+        {/* Radiant Amber & Gold Dots */}
+        <div className="absolute top-2 left-26 w-2 h-2 rounded-full bg-[#FFD700] shadow-[0_0_8px_#FFD700] opacity-95" />
+        <div className="absolute top-2 right-26 w-2.5 h-2.5 bg-[#FFD700] rotate-45 opacity-90 shadow-[0_0_6px_#FFD700]" />
+        <div className="absolute bottom-28 left-12 w-2 h-2 rounded-full bg-[#FFB300] opacity-90" />
+
+        {/* Sparkle Stars (✦) */}
+        <div className="absolute top-10 left-24 text-amber-400 text-xs font-black drop-shadow-[0_0_6px_rgba(255,215,0,0.8)] animate-spin-slow">
+          ✦
+        </div>
+        <div className="absolute top-12 right-24 text-cyan-400 text-xs font-black drop-shadow-[0_0_6px_rgba(0,229,255,0.8)]">
+          ✦
+        </div>
+        <div className="absolute bottom-30 right-16 text-pink-400 text-xs font-black drop-shadow-[0_0_6px_rgba(255,42,109,0.8)]">
+          ✦
         </div>
 
-        {/* Wheel Outer with Top Pointer */}
-        <div className="relative w-[290px] h-[290px] mx-auto mb-1">
-          {/* Top Gold Pointer Needle */}
-          <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none">
-            <div className="w-8 h-3.5 bg-gradient-to-b from-[#FFF0A0] to-[#FFD700] rounded-t-sm -mb-0.5 shadow-sm" />
+        {/* ======================================================= */}
+        {/* ELEVATED WHEEL CONTAINER WITH TOP 3D NEEDLE POINTER     */}
+        {/* ======================================================= */}
+        <div className="relative w-[320px] h-[320px] z-10 filter drop-shadow-[0_16px_24px_rgba(0,0,0,0.32)]">
+          {/* Top 3D Golden Pointer Needle at 12 o'clock */}
+          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none filter drop-shadow-[0_6px_12px_rgba(0,0,0,0.4)]">
+            <div className="w-8 h-8 bg-gradient-to-br from-[#FFE566] via-[#FFD700] to-[#B45309] rounded-full border-2 border-white flex items-center justify-center shadow-md">
+              <div className="w-3.5 h-3.5 rounded-full bg-white shadow-inner" />
+            </div>
             <div
-              className="w-8 h-11 bg-gradient-to-b from-[#FFE566] via-[#D4A000] to-[#A07000]"
+              className="w-4.5 h-5.5 -mt-2 bg-gradient-to-b from-[#FFD700] via-[#D97706] to-[#78350F]"
               style={{
                 clipPath: 'polygon(50% 100%, 0% 0%, 100% 0%)',
-                filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.55))',
               }}
             />
           </div>
 
-          {/* HTML5 Canvas */}
-          <canvas ref={canvasRef} width={290} height={290} className="w-[290px] h-[290px] block" />
+          {/* HTML5 Retina Canvas */}
+          <canvas
+            ref={canvasRef}
+            style={{ width: '320px', height: '320px' }}
+            className="block cursor-pointer transition-transform active:scale-[0.99]"
+            onClick={doSpin}
+          />
         </div>
 
-        {/* Daily 1 Free Spin Status & Midnight Reset Counter */}
-        {dailyClaimed ? (
-          <div className="mt-3 p-3.5 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-center max-w-[300px] mx-auto space-y-1.5">
-            <div className="flex items-center justify-center gap-1.5 text-amber-300 font-black text-sm">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Aaj Ka 1 Free Spin Claimed (1/1)</span>
+        {/* Photorealistic 3D Cylindrical Presentation Podium Platform with Shadows */}
+        <Realistic3DPodium />
+      </div>
+
+      {/* ========================================================= */}
+      {/* 4. DAILY 3 SPINS STATUS CARD                              */}
+      {/* ========================================================= */}
+      <div className="w-[92%] max-w-sm mx-auto mt-2 mb-3">
+        {isOutOfSpins ? (
+          <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm text-center space-y-2">
+            <div className="flex items-center justify-center gap-1.5 text-slate-900 font-black text-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span>Aaj Ke Sabhi 3 Free Spins Claimed (3/3)</span>
             </div>
-            <div className="flex items-center justify-center gap-1.5 text-xs text-white/70 font-medium">
-              <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            {/* 3 Completed Spin Badges */}
+            <div className="flex items-center justify-center gap-2 pt-0.5">
+              {[1, 2, 3].map((spinNum) => (
+                <span
+                  key={spinNum}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
+                >
+                  <span>✓</span> Spin {spinNum}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium pt-0.5">
+              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-pulse" />
               <span>
-                Agla Free Spin:{' '}
-                <span className="font-mono font-bold text-amber-300">
-                  {midnightTimer || 'Midnight'}
-                </span>{' '}
-                mein unlock hoga
+                Naye 3 Spins:{' '}
+                <strong className="font-mono font-black text-slate-800">
+                  {midnightTimer || '00:00:00'}
+                </strong>{' '}
+                mein unlock honge
               </span>
             </div>
           </div>
         ) : (
-          <p className="text-white/90 text-sm mt-2 font-medium">
-            Daily Free Spin:{' '}
-            <span className="text-amber-300 font-extrabold text-base">
-              1/1 Available Today
-            </span>
-          </p>
-        )}
+          <div className="p-3.5 rounded-2xl bg-white border border-emerald-200 shadow-sm text-center space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-1.5 text-emerald-800 font-black text-sm">
+                <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Aaj Ke Free Spins ({freeSpinsLeft}/{totalDailySpins} Baaki)</span>
+              </div>
+              <span className="text-[11px] font-black font-mono text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                {freeSpinsLeft} Left
+              </span>
+            </div>
 
-        {/* Spin Button */}
-        <div
-          className="relative w-full max-w-[280px] mx-auto mt-4 rounded-2xl p-[3px] shadow-[0_0_20px_rgba(255,165,0,0.5)]"
-          style={{
-            background: 'linear-gradient(135deg,#FFD700,#ff6b00,#ff0080,#FFD700)',
-            backgroundSize: '300% 300%',
-            animation: 'borderRainbowSpin 2.5s linear infinite',
-          }}
+            {/* 3 Step Spin Progress Indicators */}
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3].map((spinNum) => {
+                const isClaimed = spinNum <= usedSpins;
+                const isCurrent = spinNum === usedSpins + 1;
+                return (
+                  <div
+                    key={spinNum}
+                    className={`py-1.5 px-2 rounded-xl text-xs font-bold text-center border transition-all ${
+                      isClaimed
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : isCurrent
+                        ? 'bg-gradient-to-r from-amber-50 to-emerald-50 border-emerald-500 text-emerald-900 shadow-xs ring-2 ring-emerald-400/30'
+                        : 'bg-slate-50 border-slate-200 text-slate-400'
+                    }`}
+                  >
+                    {isClaimed ? `✓ Spin ${spinNum}` : isCurrent ? `🎯 Spin ${spinNum}` : `Spin ${spinNum}`}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="text-[11px] text-slate-500 font-medium">
+              Neeche button dabakar Spin #{usedSpins + 1} ghumayein
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================= */}
+      {/* 5. GLOWING VIBRANT AZURE BLUE ACTION BUTTON               */}
+      {/* ========================================================= */}
+      <div className="w-[92%] max-w-sm mx-auto mb-3">
+        <button
+          type="button"
+          onClick={doSpin}
+          disabled={isSpinning || isOutOfSpins}
+          className={`w-full py-4 px-6 rounded-full font-black text-base transition-all flex items-center justify-between shadow-xl cursor-pointer active:scale-98 ${
+            isSpinning || isOutOfSpins
+              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border border-slate-300'
+              : 'bg-gradient-to-r from-[#00A8FF] via-[#0070F3] to-[#0051FF] text-white shadow-[0_10px_28px_rgba(0,112,243,0.45)] hover:shadow-[0_12px_32px_rgba(0,112,243,0.55)]'
+          }`}
         >
-          <button
-            type="button"
-            onClick={doSpin}
-            disabled={isSpinning || dailyClaimed}
-            className={`w-full py-4 rounded-[13px] text-white font-black text-base tracking-wide transition-all shadow-lg cursor-pointer ${
-              isSpinning || dailyClaimed
-                ? 'bg-gradient-to-b from-[#2b2b2b] to-[#1c1c1c] text-white/40 cursor-not-allowed border border-white/10'
-                : 'bg-gradient-to-b from-[#e65c00] via-[#b83200] to-[#8a1f00] hover:from-[#ff6600] hover:to-[#992200] active:scale-[0.97]'
-            }`}
-          >
+          <div className="flex items-center gap-2">
+            <Disc className={`w-5 h-5 ${isSpinning ? 'animate-spin' : ''}`} />
+          </div>
+          <span className="tracking-wide font-black">
             {isSpinning
               ? 'Ghoom Raha Hai...'
-              : dailyClaimed
-              ? 'Aaj Ka Spin Claimed ✓'
-              : '🎉 Spin The Wheel (1 Free)'}
-          </button>
-        </div>
-
-        {/* Tagline */}
-        <p className="text-white/40 text-[11px] mt-3 leading-relaxed">
-          Daily Strictly 1 Free Spin Only • Instant Real Cash Added to Wallet
-          <br />
-          Counter resets every midnight at 00:00 AM.
-        </p>
+              : isOutOfSpins
+              ? 'All 3 Spins Claimed Today ✓'
+              : `Spin Now (${freeSpinsLeft}/3 Left)`}
+          </span>
+          <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+        </button>
       </div>
+
+      {/* ========================================================= */}
+      {/* 6. FOOTER TRUST BADGE CAPSULE                             */}
+      {/* ========================================================= */}
+      <div className="w-[92%] max-w-sm mx-auto">
+        <div className="py-2.5 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center gap-3">
+          <span className="flex items-center gap-1 text-emerald-700">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>100% Secure</span>
+          </span>
+          <span className="text-slate-300">•</span>
+          <span>Daily 3 Free Spins</span>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* RESULT CELEBRATION MODAL                                  */}
+      {/* ========================================================= */}
+      {showResultModal && wonSegment && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex flex-col items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white border-2 border-amber-400 rounded-3xl p-7 text-center shadow-2xl max-w-xs w-full space-y-3 animate-zoom-in">
+            <div className="text-5xl">{resEmoji}</div>
+            <div className="space-y-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">
+                Badhai Ho!
+              </span>
+              <h3 className="text-base font-black text-slate-900 pt-1">
+                Aapne Spin Me Jeeta
+              </h3>
+              <div className="text-5xl font-black text-emerald-600 py-1 font-mono">
+                {wonSegment.label}
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                {freeSpinsLeft - 1 > 0
+                  ? `Wallet me credit ho gaya! (${freeSpinsLeft - 1} spins abhi baaki hain)`
+                  : 'Wallet me instant credit ho gaya! Aaj ke 3 spins pure ho gaye.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClaim}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-sm shadow-md cursor-pointer active:scale-95 transition-all"
+            >
+              {freeSpinsLeft - 1 > 0
+                ? `Claim & Play Next (${freeSpinsLeft - 1} Left)`
+                : 'Claim & Collect Cash ✓'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

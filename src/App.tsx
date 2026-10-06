@@ -5,6 +5,7 @@ import {
   Disc,
   Gift,
   User,
+  Users,
   Sparkles,
   ArrowRight,
   Share2,
@@ -226,18 +227,44 @@ export default function App() {
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  const [freeSpinsLeft, setFreeSpinsLeft] = useState<number>(() => {
+    const savedDate = localStorage.getItem('realmoney_spin_date');
+    const today = new Date().toISOString().slice(0, 10);
+    if (savedDate === today) {
+      const used = parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10);
+      return Math.max(0, 3 - used);
+    }
+    return 3;
+  });
+
   const [dailySpinClaimed, setDailySpinClaimed] = useState<boolean>(() => {
     const savedDate = localStorage.getItem('realmoney_spin_date');
-    return savedDate === new Date().toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    if (savedDate === today) {
+      const used = parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10);
+      return used >= 3;
+    }
+    return false;
+  });
+
+  const [freeScratchesLeft, setFreeScratchesLeft] = useState<number>(() => {
+    const savedDate = localStorage.getItem('realmoney_scratch_date');
+    const today = new Date().toISOString().slice(0, 10);
+    if (savedDate === today) {
+      const used = parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10);
+      return Math.max(0, 3 - used);
+    }
+    return 3;
   });
 
   const [dailyScratchClaimed, setDailyScratchClaimed] = useState<boolean>(() => {
     const savedDate = localStorage.getItem('realmoney_scratch_date');
-    return savedDate === new Date().toISOString().slice(0, 10);
-  });
-
-  const [freeSpinsLeft, setFreeSpinsLeft] = useState<number>(() => {
-    return localStorage.getItem('realmoney_spin_date') === new Date().toISOString().slice(0, 10) ? 0 : 1;
+    const today = new Date().toISOString().slice(0, 10);
+    if (savedDate === today) {
+      const used = parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10);
+      return used >= 3;
+    }
+    return false;
   });
 
   const [dailyBonusClaimed, setDailyBonusClaimed] = useState<boolean>(() => {

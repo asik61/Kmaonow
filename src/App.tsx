@@ -302,6 +302,8 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
   });
 
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -477,12 +479,23 @@ export default function App() {
     showToast(`Screenshot submit ho gaya! ₹${targetTask.reward_amount.toFixed(2)} under review hai. 🎉`);
   };
 
-  // Spin Reward Won (Daily 1 Free Spin Only)
+  // Spin Reward Won (Daily 3 Free Spins)
   const handleSpinWon = (amount: number) => {
     const today = new Date().toISOString().slice(0, 10);
+    const savedDate = localStorage.getItem('realmoney_spin_date');
+    let usedToday = 0;
+    if (savedDate === today) {
+      usedToday = parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10);
+    }
+    const newUsed = usedToday + 1;
     localStorage.setItem('realmoney_spin_date', today);
-    setDailySpinClaimed(true);
-    setFreeSpinsLeft(0);
+    localStorage.setItem('realmoney_spins_count', String(newUsed));
+
+    const remaining = Math.max(0, 3 - newUsed);
+    setFreeSpinsLeft(remaining);
+    if (remaining <= 0) {
+      setDailySpinClaimed(true);
+    }
 
     setWallet((prev) => ({
       ...prev,
@@ -496,18 +509,34 @@ export default function App() {
       type: 'spin_reward',
       amount,
       status: 'credit',
-      description: `Daily Lucky Spin Reward: ₹${amount.toFixed(2)}`,
+      description: `Daily Lucky Spin #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
     setLedger([newEntry, ...ledger]);
-    showToast(`+₹${amount.toFixed(2)} credited! Aaj ka free spin claimed.`);
+    if (remaining > 0) {
+      showToast(`+₹${amount.toFixed(2)} credited! Abhi ${remaining}/3 free spins baaki hain. 🎯`);
+    } else {
+      showToast(`+₹${amount.toFixed(2)} credited! Aaj ke sabhi 3 free spins complete ho gaye. 🎉`);
+    }
   };
 
-  // Scratch Reward Won (Daily 1 Free Scratch Card Only)
+  // Scratch Reward Won (Daily 3 Free Scratch Cards)
   const handleScratchWon = (amount: number) => {
     const today = new Date().toISOString().slice(0, 10);
+    const savedDate = localStorage.getItem('realmoney_scratch_date');
+    let usedToday = 0;
+    if (savedDate === today) {
+      usedToday = parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10);
+    }
+    const newUsed = usedToday + 1;
     localStorage.setItem('realmoney_scratch_date', today);
-    setDailyScratchClaimed(true);
+    localStorage.setItem('realmoney_scratch_count', String(newUsed));
+
+    const remaining = Math.max(0, 3 - newUsed);
+    setFreeScratchesLeft(remaining);
+    if (remaining <= 0) {
+      setDailyScratchClaimed(true);
+    }
 
     setWallet((prev) => ({
       ...prev,
@@ -521,11 +550,15 @@ export default function App() {
       type: 'scratch_reward',
       amount,
       status: 'credit',
-      description: `Daily Scratch Card Reward: ₹${amount.toFixed(2)}`,
+      description: `Daily Scratch Card #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
     setLedger([newEntry, ...ledger]);
-    showToast(`+₹${amount.toFixed(2)} credited! Aaj ka scratch card claimed.`);
+    if (remaining > 0) {
+      showToast(`+₹${amount.toFixed(2)} credited! Abhi ${remaining}/3 scratch cards baaki hain. 🎁`);
+    } else {
+      showToast(`+₹${amount.toFixed(2)} credited! Aaj ke sabhi 3 scratch cards complete ho gaye. 🎉`);
+    }
   };
 
   // Daily Bonus
@@ -1234,73 +1267,75 @@ export default function App() {
       )}
 
       {/* TOP HEADER (Compact, Clean & Mobile Friendly) */}
-      <header className="sticky top-0 z-40 bg-gradient-to-r from-[#045D44] via-[#059669] to-[#047857] text-white border-b border-emerald-400/30 px-3.5 sm:px-6 h-13 flex items-center justify-between shadow-md">
-        {/* Left Slot: 3D Logo or Back Button if inside a subscreen */}
-        {activeTab === 'home' ? (
-          <div
-            onClick={() => setActiveTab('home')}
-            className="flex items-center gap-2 cursor-pointer select-none"
-          >
-            <KamaoNowLogo3D size={34} />
-            <div className="flex flex-col">
-              <div className="flex items-center text-base sm:text-lg font-black tracking-tight leading-none">
-                <span className="text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">Real</span>
-                <span className="text-amber-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] ml-1">Money</span>
-                <span className="text-emerald-200 text-[10px] font-black ml-1.5 px-1.5 py-0.5 bg-emerald-950/40 rounded border border-emerald-400/30">APP</span>
-              </div>
-              <div className="text-[9px] text-emerald-100/90 font-medium tracking-wide mt-0.5">
-                Daily Tasks • Real Cash • Instant UPI
+      {activeTab !== 'spin' && activeTab !== 'scratch' && (
+        <header className="sticky top-0 z-40 bg-gradient-to-r from-[#045D44] via-[#059669] to-[#047857] text-white border-b border-emerald-400/30 px-3.5 sm:px-6 h-13 flex items-center justify-between shadow-md">
+          {/* Left Slot: 3D Logo or Back Button if inside a subscreen */}
+          {activeTab === 'home' ? (
+            <div
+              onClick={() => setActiveTab('home')}
+              className="flex items-center gap-2 cursor-pointer select-none"
+            >
+              <KamaoNowLogo3D size={34} />
+              <div className="flex flex-col">
+                <div className="flex items-center text-base sm:text-lg font-black tracking-tight leading-none">
+                  <span className="text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]">Real</span>
+                  <span className="text-amber-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] ml-1">Money</span>
+                  <span className="text-emerald-200 text-[10px] font-black ml-1.5 px-1.5 py-0.5 bg-emerald-950/40 rounded border border-emerald-400/30">APP</span>
+                </div>
+                <div className="text-[9px] text-emerald-100/90 font-medium tracking-wide mt-0.5">
+                  Daily Tasks • Real Cash • Instant UPI
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setActiveTab('home')}
-            className="flex items-center gap-2 text-white font-black text-sm hover:text-emerald-200 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-5 h-5 text-white" />
-            <span className="capitalize">{activeTab === 'refer' ? 'Refer & Earn' : activeTab === 'daily' ? 'Daily Bonus' : activeTab}</span>
-          </button>
-        )}
-
-        {/* Right Slot: Notification bell (ghanta) & discreet admin trigger */}
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setShowRulesModal(true)}
-            className="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
-            title="Kamaai Ke Niyam & Policy"
-          >
-            <span>📜 Niyam</span>
-          </button>
-
-          {isMasterAdmin && (
+          ) : (
             <button
               type="button"
-              onClick={() => setShowAdminPanel(true)}
-              className="w-7 h-7 rounded-full bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-amber-400/30"
-              title="Admin Master Desk (asik94906@gmail.com)"
+              onClick={() => setActiveTab('home')}
+              className="flex items-center gap-2 text-white font-black text-sm hover:text-emerald-200 transition-colors cursor-pointer"
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-5 h-5 text-white" />
+              <span className="capitalize">{activeTab === 'refer' ? 'Refer & Earn' : activeTab === 'daily' ? 'Daily Bonus' : activeTab}</span>
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => setShowNotificationModal(true)}
-            className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer backdrop-blur-xs relative"
-            title="Notifications"
-          >
-            <Bell className="w-3.5 h-3.5 text-white" />
-            {notifications.filter((n) => !n.read).length > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-amber-400 text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center px-0.5 shadow-sm animate-pulse">
-                {notifications.filter((n) => !n.read).length}
-              </span>
+          {/* Right Slot: Notification bell (ghanta) & discreet admin trigger */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowRulesModal(true)}
+              className="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+              title="Kamaai Ke Niyam & Policy"
+            >
+              <span>📜 Niyam</span>
+            </button>
+
+            {isMasterAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowAdminPanel(true)}
+                className="w-7 h-7 rounded-full bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-amber-400/30"
+                title="Admin Master Desk (asik94906@gmail.com)"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </button>
             )}
-          </button>
-        </div>
-      </header>
+
+            <button
+              type="button"
+              onClick={() => setShowNotificationModal(true)}
+              className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white transition-colors cursor-pointer backdrop-blur-xs relative"
+              title="Notifications"
+            >
+              <Bell className="w-3.5 h-3.5 text-white" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-amber-400 text-slate-950 font-black text-[9px] rounded-full flex items-center justify-center px-0.5 shadow-sm animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* MAIN MOBILE APP CANVAS (Compact & Mobile Friendly Spacing) */}
       <main className="w-full max-w-md md:max-w-xl mx-auto px-3.5 pt-2.5 pb-6 space-y-2.5 grow">
@@ -1444,7 +1479,23 @@ export default function App() {
                   <span className="text-[11px] font-bold text-slate-800">Scratch Card</span>
                 </button>
 
-                {/* 4. Daily Bonus */}
+                {/* 4. Refer & Earn */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('refer')}
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-emerald-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group relative overflow-hidden"
+                >
+                  <span className="absolute top-1 right-1 px-1.5 py-0.2 rounded-full bg-amber-400 text-amber-950 text-[9px] font-black leading-tight shadow-xs">
+                    ₹5
+                  </span>
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#059669] to-[#047857] text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(5,150,105,0.3)] group-hover:scale-105 transition-transform">
+                    {/* 3D Users / Refer Friends Icon */}
+                    <Users className="w-5 h-5 stroke-[2.2] text-white" />
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-800">Refer &amp; Earn</span>
+                </button>
+
+                {/* 5. Daily Bonus */}
                 <button
                   type="button"
                   onClick={() => setActiveTab('daily')}
@@ -1461,23 +1512,6 @@ export default function App() {
                     </svg>
                   </div>
                   <span className="text-[11px] font-bold text-slate-800">Daily Bonus</span>
-                </button>
-
-                {/* 5. Offers */}
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('offers')}
-                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group"
-                >
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#FACC15] to-[#D97706] text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(245,158,11,0.3)] group-hover:scale-105 transition-transform">
-                    {/* Real Discount Price Tag with % Sign */}
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                      <path d="M12.5 3.5 L19.5 3.5 C20.3 3.5 21 4.2 21 5 L21 12 C21 12.4 20.8 12.8 20.5 13.1 L12.5 21.1 C11.7 21.9 10.4 21.9 9.6 21.1 L2.9 14.4 C2.1 13.6 2.1 12.3 2.9 11.5 L10.9 3.5 C11.2 3.2 11.6 3.5 12.5 3.5 Z" fill="#FFFFFF" fillOpacity="0.25" stroke="#FFFFFF" strokeWidth="2" strokeLinejoin="round" />
-                      <circle cx="16.5" cy="7.5" r="1.8" fill="#FDE047" />
-                      <text x="8.5" y="14.5" fill="#FFFFFF" fontSize="8" fontWeight="900" fontFamily="sans-serif">%</text>
-                    </svg>
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-800">Offers</span>
                 </button>
 
                 {/* 6. Profile */}
@@ -1497,6 +1531,28 @@ export default function App() {
                   <span className="text-[11px] font-bold text-slate-800">Profile</span>
                 </button>
               </div>
+            </div>
+
+            {/* DEDICATED REFER & EARN BANNER CARD */}
+            <div
+              onClick={() => setActiveTab('refer')}
+              className="p-3.5 rounded-2xl bg-gradient-to-r from-[#065F46] via-[#047857] to-[#059669] border border-emerald-400/30 text-white flex items-center justify-between shadow-md cursor-pointer hover:shadow-lg transition-all active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center text-xl shadow-xs">
+                  🎁
+                </div>
+                <div>
+                  <div className="text-xs font-black text-white flex items-center gap-1.5">
+                    <span>Doston Ko Invite Karein</span>
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-black">₹5.00/Friend</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-100/90 font-medium mt-0.5">
+                    Apna referral code share karein aur turant ₹5.00 payein
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-white/80 shrink-0" />
             </div>
 
             {/* 4. ACTIVE TASKS PREVIEW ON HOME (CRISP WHITE CARDS) */}
@@ -1721,9 +1777,14 @@ export default function App() {
         {activeTab === 'spin' && (
           <div className="animate-fade-in">
             <SpinWheel
-              freeSpinsLeft={dailySpinClaimed ? 0 : 1}
-              dailyClaimed={dailySpinClaimed}
+              freeSpinsLeft={freeSpinsLeft}
+              totalDailySpins={3}
+              dailyClaimed={dailySpinClaimed || freeSpinsLeft <= 0}
               onRewardWon={handleSpinWon}
+              onBack={() => setActiveTab('home')}
+              onOpenRules={() => setShowRulesModal(true)}
+              onOpenNotifications={() => setShowNotificationModal(true)}
+              unreadNotificationsCount={unreadCount}
             />
           </div>
         )}
@@ -1734,8 +1795,14 @@ export default function App() {
         {activeTab === 'scratch' && (
           <div className="animate-fade-in">
             <ScratchCard
-              dailyClaimed={dailyScratchClaimed}
+              freeScratchesLeft={freeScratchesLeft}
+              totalDailyScratches={3}
+              dailyClaimed={dailyScratchClaimed || freeScratchesLeft <= 0}
               onRewardWon={handleScratchWon}
+              onBack={() => setActiveTab('home')}
+              onOpenRules={() => setShowRulesModal(true)}
+              onOpenNotifications={() => setShowNotificationModal(true)}
+              unreadNotificationsCount={unreadCount}
             />
           </div>
         )}
@@ -2157,9 +2224,9 @@ export default function App() {
       </main>
 
       {/* ========================================================= */}
-      {/* 5-TAB 3D MOBILE BOTTOM NAV (CRISP WHITE BAR)              */}
+      {/* 6-TAB 3D MOBILE BOTTOM NAV (CRISP WHITE BAR)              */}
       {/* ========================================================= */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-2 py-2 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-1 py-1.5 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
         {/* 1. Home */}
         <button
           type="button"
@@ -2170,8 +2237,8 @@ export default function App() {
               : 'text-slate-400 hover:text-slate-700'
           }`}
         >
-          <Home className="w-5 h-5 stroke-[2.5]" />
-          <span className="text-[10px] mt-0.5 tracking-tight">Home</span>
+          <Home className="w-5 h-5 stroke-[2.2]" />
+          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Home</span>
         </button>
 
         {/* 2. Tasks */}
@@ -2184,8 +2251,8 @@ export default function App() {
               : 'text-slate-400 hover:text-slate-700'
           }`}
         >
-          <CheckSquare className="w-5 h-5 stroke-[2.5]" />
-          <span className="text-[10px] mt-0.5 tracking-tight">Tasks</span>
+          <CheckSquare className="w-5 h-5 stroke-[2.2]" />
+          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Tasks</span>
         </button>
 
         {/* 3. Spin */}
@@ -2198,8 +2265,8 @@ export default function App() {
               : 'text-slate-400 hover:text-slate-700'
           }`}
         >
-          <Disc className="w-5 h-5 stroke-[2.5]" />
-          <span className="text-[10px] mt-0.5 tracking-tight">Spin</span>
+          <Disc className="w-5 h-5 stroke-[2.2]" />
+          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Spin</span>
         </button>
 
         {/* 4. Scratch */}
@@ -2212,11 +2279,28 @@ export default function App() {
               : 'text-slate-400 hover:text-slate-700'
           }`}
         >
-          <Sparkles className="w-5 h-5 stroke-[2.5]" />
-          <span className="text-[10px] mt-0.5 tracking-tight">Scratch</span>
+          <Sparkles className="w-5 h-5 stroke-[2.2]" />
+          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Scratch</span>
         </button>
 
-        {/* 5. Profile */}
+        {/* 5. Refer */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('refer')}
+          className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all relative ${
+            activeTab === 'refer'
+              ? 'text-emerald-600 font-black scale-105'
+              : 'text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          <span className="absolute -top-1 right-0 text-[8px] font-black bg-amber-400 text-amber-950 px-1 py-0.2 rounded-full leading-tight shadow-xs">
+            ₹5
+          </span>
+          <Users className="w-5 h-5 stroke-[2.2]" />
+          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Refer</span>
+        </button>
+
+        {/* 6. Profile */}
         <button
           type="button"
           onClick={() => setActiveTab('profile')}
@@ -2226,8 +2310,8 @@ export default function App() {
               : 'text-slate-400 hover:text-slate-700'
           }`}
         >
-          <User className="w-5 h-5 stroke-[2.5]" />
-          <span className="text-[10px] mt-0.5 tracking-tight">Profile</span>
+          <User className="w-5 h-5 stroke-[2.2]" />
+          <span className="text-[10px] mt-0.5 tracking-tight font-medium">Profile</span>
         </button>
       </nav>
 

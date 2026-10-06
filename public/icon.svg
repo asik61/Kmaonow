@@ -1,122 +1,177 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <!-- Background Gradient: Rich Vibrant Emerald (Matches original splash icon) -->
-    <linearGradient id="emeraldBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#064E3B" />
-      <stop offset="35%" stop-color="#047857" />
-      <stop offset="75%" stop-color="#059669" />
-      <stop offset="100%" stop-color="#10B981" />
-    </linearGradient>
+    <!-- Background Rich Emerald Gradient (Matches uploaded logo 1:1) -->
+    <radialGradient id="emeraldBg" cx="42%" cy="42%" r="68%">
+      <stop offset="0%" stop-color="#1B8A5E" />
+      <stop offset="55%" stop-color="#11734D" />
+      <stop offset="85%" stop-color="#0B573B" />
+      <stop offset="100%" stop-color="#07442D" />
+    </radialGradient>
 
-    <!-- Top Gloss Highlight -->
-    <linearGradient id="glossGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.38" />
-      <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.08" />
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
-    </linearGradient>
-
-    <!-- 3D Gold Coin Gradient -->
-    <linearGradient id="goldCoinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFFBEB" />
-      <stop offset="20%" stop-color="#FEF08A" />
-      <stop offset="50%" stop-color="#FACC15" />
-      <stop offset="80%" stop-color="#EAB308" />
-      <stop offset="100%" stop-color="#CA8A04" />
-    </linearGradient>
-
-    <!-- Gold Bevel Gradient -->
-    <linearGradient id="goldBevel" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" />
-      <stop offset="35%" stop-color="#FDE047" />
-      <stop offset="75%" stop-color="#CA8A04" />
-      <stop offset="100%" stop-color="#A16207" />
-    </linearGradient>
-
-    <!-- Rising Growth Arrow Gradient -->
-    <linearGradient id="arrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#10B981" />
-      <stop offset="40%" stop-color="#34D399" />
-      <stop offset="75%" stop-color="#FACC15" />
-      <stop offset="100%" stop-color="#FEF08A" />
-    </linearGradient>
-
-    <!-- Drop Shadows -->
-    <filter id="coinShadow" x="-20%" y="-20%" width="150%" height="150%">
-      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#022c22" flood-opacity="0.65" />
+    <!-- Coin Shadow -->
+    <filter id="coinDropShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#02281C" flood-opacity="0.65" />
     </filter>
 
-    <filter id="glowShadow" x="-20%" y="-20%" width="150%" height="150%">
-      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#047857" flood-opacity="0.5" />
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#FACC15" flood-opacity="0.4" />
+    <!-- Green Glowing Arrow Tail Filter -->
+    <filter id="greenNeonGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#00E676" flood-opacity="0.85" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#00B0FF" flood-opacity="0.25" />
     </filter>
 
-    <!-- Inner Border Glow -->
-    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#6EE7B7" stop-opacity="0.85" />
-      <stop offset="50%" stop-color="#34D399" stop-opacity="0.35" />
-      <stop offset="100%" stop-color="#059669" stop-opacity="0.65" />
+    <!-- Gold Arrow Glow -->
+    <filter id="arrowDropShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#064E3B" flood-opacity="0.45" />
+      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#FDE047" flood-opacity="0.4" />
+    </filter>
+
+    <!-- Star Glow -->
+    <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#FDE047" flood-opacity="0.9" />
+    </filter>
+
+    <!-- Coin 3D Outer Rim Gradient -->
+    <linearGradient id="goldRimGrad" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#FFF59D" />
+      <stop offset="25%" stop-color="#FDD835" />
+      <stop offset="65%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+
+    <!-- Coin Inner Face Rich Gold Gradient -->
+    <radialGradient id="goldFaceGrad" cx="38%" cy="32%" r="65%">
+      <stop offset="0%" stop-color="#FFF9C4" />
+      <stop offset="25%" stop-color="#FDE047" />
+      <stop offset="60%" stop-color="#F59E0B" />
+      <stop offset="90%" stop-color="#D97706" />
+      <stop offset="100%" stop-color="#B45309" />
+    </radialGradient>
+
+    <!-- Golden Arrow Gradient -->
+    <linearGradient id="yellowArrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="50%" stop-color="#FFF176" />
+      <stop offset="100%" stop-color="#FFF9C4" />
+    </linearGradient>
+
+    <!-- Green Arrow Tail Gradient -->
+    <linearGradient id="greenTailGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#00E676" />
+      <stop offset="70%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
     </linearGradient>
   </defs>
 
-  <!-- 1. FULL-BLEED EMERALD ICON BASE (No outer extra box!) -->
+  <!-- 1. FULL BACKGROUND EMERALD CANVAS -->
   <rect width="512" height="512" fill="url(#emeraldBg)" />
-  <rect x="6" y="6" width="500" height="500" stroke="url(#borderGrad)" stroke-width="8" fill="none" opacity="0.8" />
 
-  <!-- 2. Glassmorphism Top Highlight Sheen -->
-  <path d="M 0 0 L 512 0 L 512 160 C 512 240 380 280 256 280 C 120 280 0 240 0 160 Z" fill="url(#glossGrad)" />
+  <!-- 2. CONCENTRIC FAINT DASHED WEALTH ORBIT RINGS -->
+  <circle cx="256" cy="260" r="214" stroke="#34D399" stroke-width="2" stroke-dasharray="8 8" stroke-opacity="0.32" fill="none" />
+  <circle cx="256" cy="260" r="162" stroke="#6EE7B7" stroke-width="2.2" stroke-dasharray="6 7" stroke-opacity="0.38" fill="none" />
 
-  <!-- 3. Ambient Wealth Rings -->
-  <circle cx="256" cy="256" r="190" stroke="#34D399" stroke-opacity="0.16" stroke-width="2.5" stroke-dasharray="8 8" />
-  <circle cx="256" cy="256" r="150" stroke="#6EE7B7" stroke-opacity="0.22" stroke-width="2.5" />
+  <!-- Orbit Accent Glowing Dots -->
+  <circle cx="96" cy="305" r="5" fill="#34D399" filter="url(#greenNeonGlow)" />
+  <circle cx="360" cy="272" r="5.5" fill="#34D399" filter="url(#greenNeonGlow)" />
 
-  <!-- 4. Dynamic Rising Growth Path (Behind Coin) -->
-  <path d="M 96 376 Q 180 376 220 310 T 384 148" fill="none" stroke="url(#arrowGrad)" stroke-width="28" stroke-linecap="round" filter="url(#glowShadow)" />
-  
-  <!-- Arrow Head -->
-  <path d="M 324 138 L 400 136 L 402 212" fill="none" stroke="#FEF08A" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" filter="url(#glowShadow)" />
+  <!-- 3. CURVED GREEN GLOWING ARROW RIBBON (Behind Coin - Bottom Left) -->
+  <g filter="url(#greenNeonGlow)">
+    <path
+      d="M 68 392 C 105 408, 155 410, 208 388 C 235 377, 260 360, 282 340"
+      fill="none"
+      stroke="url(#greenTailGrad)"
+      stroke-width="36"
+      stroke-linecap="round"
+    />
+  </g>
 
-  <!-- 5. 3D GOLDEN INDIAN RUPEE COIN (BIG & CENTERED) -->
-  <g filter="url(#coinShadow)">
-    <!-- Outer Gold Rim Base -->
-    <circle cx="256" cy="266" r="118" fill="#854D0E" />
-    <circle cx="256" cy="260" r="118" fill="url(#goldBevel)" />
-    
-    <!-- Coin Face Inner Dish -->
-    <circle cx="256" cy="260" r="102" fill="url(#goldCoinGrad)" />
-    <circle cx="256" cy="260" r="92" stroke="#FDE047" stroke-width="3" stroke-dasharray="6 4" fill="none" stroke-opacity="0.85" />
+  <!-- 4. RISING GOLDEN ARROW HEAD & UPPER SHAFT (Behind Coin - Emerging Top Right) -->
+  <g filter="url(#arrowDropShadow)">
+    <!-- Golden Arrow Shaft -->
+    <path
+      d="M 285 305 C 330 255, 365 210, 405 160"
+      fill="none"
+      stroke="url(#yellowArrowGrad)"
+      stroke-width="34"
+      stroke-linecap="round"
+    />
 
-    <!-- Rupee '₹' 3D Shadow -->
-    <g transform="translate(2, 4)" stroke="#78350F" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M 224 218 L 288 218" />
-      <path d="M 224 244 L 282 244" />
-      <path d="M 248 218 C 276 218, 288 230, 288 248 C 288 266, 268 276, 246 276 L 228 276" fill="none" />
-      <path d="M 242 276 L 288 318" />
+    <!-- Golden Arrowhead (Pointed Top-Right at 45° with Rounded Tips) -->
+    <path
+      d="M 324 135 C 320 135, 318 132, 320 128 C 322 122, 335 120, 360 121 L 418 122 C 430 122, 436 128, 436 140 L 436 198 C 436 220, 432 232, 426 234 C 422 236, 418 234, 418 228 L 418 165 L 340 242 C 335 247, 326 247, 321 242 C 316 237, 316 229, 321 224 L 398 147 L 335 147 C 328 147, 324 142, 324 135 Z"
+      fill="url(#yellowArrowGrad)"
+      stroke="#FEF08A"
+      stroke-width="3"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
+  </g>
+
+  <!-- 5. 3D GOLDEN INDIAN RUPEE COIN (LARGE, PROMINENT CENTERPIECE) -->
+  <g filter="url(#coinDropShadow)">
+    <!-- Outer Gold Coin Rim Rim Bevel Base -->
+    <circle cx="256" cy="260" r="134" fill="#92400E" />
+    <circle cx="256" cy="258" r="133" fill="url(#goldRimGrad)" />
+
+    <!-- Coin Inner Dish Face -->
+    <circle cx="256" cy="258" r="121" fill="url(#goldFaceGrad)" />
+
+    <!-- Coin Inner Dashed Gold Stitch Ring -->
+    <circle
+      cx="256"
+      cy="258"
+      r="108"
+      stroke="#FFF9C4"
+      stroke-width="3.5"
+      stroke-dasharray="6 5"
+      fill="none"
+      stroke-opacity="0.88"
+    />
+
+    <!-- Specular Highlight Glints on Coin Face -->
+    <circle cx="218" cy="164" r="6" fill="#FFFFFF" opacity="0.95" />
+    <circle cx="230" cy="158" r="3" fill="#FFFFFF" opacity="0.8" />
+
+    <!-- 6. RUPEE '₹' 3D CARAMEL DROP SHADOW -->
+    <g transform="translate(4, 9)" stroke="#4E342E" stroke-width="19" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <!-- Top Bar -->
+      <path d="M 218 206 L 294 206" />
+      <!-- Middle Bar -->
+      <path d="M 218 235 L 282 235" />
+      <!-- Upper Half Loop -->
+      <path d="M 248 206 C 286 206, 298 220, 298 240 C 298 262, 276 274, 246 274 L 222 274" />
+      <!-- Lower Leg -->
+      <path d="M 242 274 L 296 328" />
     </g>
 
-    <!-- Rupee '₹' Main Golden White Sculpted Symbol -->
-    <g stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M 224 216 L 288 216" />
-      <path d="M 224 242 L 282 242" />
-      <path d="M 248 216 C 276 216, 288 228, 288 246 C 288 264, 268 274, 246 274 L 228 274" fill="none" />
-      <path d="M 242 274 L 288 316" />
-    </g>
-
-    <!-- Subtle Bevel Inner Line -->
-    <g stroke="#FEF08A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
-      <path d="M 228 216 L 280 216" />
-      <path d="M 228 242 L 276 242" />
+    <!-- 7. RUPEE '₹' CRISP SCULPTED WHITE SYMBOL -->
+    <g stroke="#FFFFFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <!-- Top Bar -->
+      <path d="M 218 206 L 294 206" />
+      <!-- Middle Bar -->
+      <path d="M 218 235 L 282 235" />
+      <!-- Upper Half Loop -->
+      <path d="M 248 206 C 286 206, 298 220, 298 240 C 298 262, 276 274, 246 274 L 222 274" />
+      <!-- Lower Leg -->
+      <path d="M 242 274 L 296 328" />
     </g>
   </g>
 
-  <!-- 6. Floating Sparkles / Diamond Stars of Prosperity -->
-  <!-- Top Left Sparkle -->
-  <path d="M 124 110 Q 124 130 104 130 Q 124 130 124 150 Q 124 130 144 130 Q 124 130 124 110 Z" fill="#FDE047" opacity="0.95" />
-  <circle cx="124" cy="130" r="3.5" fill="#FFFFFF" />
+  <!-- 8. PROSPERITY DIAMOND SPARKLE STARS (✦) -->
+  <!-- Top-Left Sparkle Star with Radial Halo -->
+  <g filter="url(#starGlow)">
+    <path
+      d="M 106 88 Q 106 112 82 112 Q 106 112 106 136 Q 106 112 130 112 Q 106 112 106 88 Z"
+      fill="#FFF59D"
+    />
+    <circle cx="106" cy="112" r="3.5" fill="#FFFFFF" />
+  </g>
 
-  <!-- Bottom Right Sparkle -->
-  <path d="M 408 360 Q 408 376 392 376 Q 408 376 408 392 Q 408 376 424 376 Q 408 376 408 360 Z" fill="#FEF08A" opacity="0.9" />
-
-  <!-- Center Top Tiny Glint -->
-  <circle cx="224" cy="174" r="4.5" fill="#FFFFFF" opacity="0.85" />
-  <circle cx="346" cy="270" r="5.5" fill="#34D399" opacity="0.8" />
+  <!-- Bottom-Right Sparkle Star with Radial Halo -->
+  <g filter="url(#starGlow)">
+    <path
+      d="M 432 376 Q 432 396 412 396 Q 432 396 432 416 Q 432 396 452 396 Q 432 396 432 376 Z"
+      fill="#FFF59D"
+    />
+    <circle cx="432" cy="396" r="3.2" fill="#FFFFFF" />
+  </g>
 </svg>

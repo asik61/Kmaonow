@@ -63,6 +63,7 @@ import {
   EarningsCharacter3D,
   ReferCharacter3D,
   GiftBox3D,
+  ScratchNavIcon,
 } from './components/Illustrations3D';
 
 import { SpinWheel } from './components/SpinWheel';
@@ -1812,16 +1813,8 @@ export default function App() {
                   onClick={() => navigateTo('scratch')}
                   className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group"
                 >
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#F43F5E] to-[#BE123C] text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(244,63,94,0.3)] group-hover:scale-105 transition-transform">
-                    {/* Real Scratch Card with Scratched Surface & Shining Coin */}
-                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                      <rect x="3.5" y="4.5" width="17" height="15" rx="3" fill="#FFFFFF" fillOpacity="0.25" stroke="#FFFFFF" strokeWidth="2" />
-                      <path d="M5.5 13 C8 10.5 10.5 14.5 13.5 11.5 C15.5 9.5 17 11.5 18.5 10 L18.5 6 C18.5 5.5 18 5 17.5 5 L5.5 5 Z" fill="#FFFFFF" fillOpacity="0.45" />
-                      {/* Golden Star Revealed */}
-                      <path d="M12 9.5 L12.7 11.2 L14.5 11.5 L13.2 12.8 L13.5 14.5 L12 13.6 L10.5 14.5 L10.8 12.8 L9.5 11.5 L11.3 11.2 Z" fill="#FDE047" stroke="#CA8A04" strokeWidth="0.8" />
-                      {/* Coin scratcher */}
-                      <circle cx="6.5" cy="15.5" r="2" fill="#FDE047" stroke="#FFFFFF" strokeWidth="0.8" />
-                    </svg>
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(16,185,129,0.3)] group-hover:scale-105 transition-transform">
+                    <ScratchNavIcon active={true} className="w-5.5 h-5.5" />
                   </div>
                   <span className="text-[11px] font-bold text-slate-800">Scratch Card</span>
                 </button>
@@ -2509,7 +2502,7 @@ export default function App() {
                 className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left"
               >
                 <div className="flex items-center gap-3">
-                  <Sparkles className="w-4 h-4 text-emerald-600" />
+                  <ScratchNavIcon active={false} className="w-4 h-4 text-emerald-600" />
                   <span className="font-bold text-slate-900">Scratch History</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
@@ -2620,13 +2613,22 @@ export default function App() {
         <button
           type="button"
           onClick={() => navigateTo('scratch')}
-          className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all ${
+          className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all relative ${
             activeTab === 'scratch'
               ? 'text-emerald-600 font-black scale-105'
               : 'text-slate-400 hover:text-slate-700'
           }`}
         >
-          <Sparkles className="w-5 h-5 stroke-[2.2]" />
+          {freeScratchesLeft > 0 ? (
+            <span className="absolute -top-1 right-0 text-[8px] font-black bg-gradient-to-r from-amber-400 to-emerald-400 text-emerald-950 px-1 py-0.2 rounded-full leading-tight shadow-xs animate-pulse">
+              {freeScratchesLeft}
+            </span>
+          ) : (
+            <span className="absolute -top-1 right-0 text-[7px] font-bold bg-slate-200 text-slate-500 px-1 py-0.2 rounded-full leading-tight">
+              0
+            </span>
+          )}
+          <ScratchNavIcon active={activeTab === 'scratch'} className="w-5.5 h-5.5" />
           <span className="text-[10px] mt-0.5 tracking-tight font-medium">Scratch</span>
         </button>
 

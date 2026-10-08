@@ -844,3 +844,5 @@ export const HeroPhone3DIllustration: React.FC<{ className?: string }> = ({ clas
   </svg>
 );
 
+export { ScratchNavIcon } from './ScratchNavIcon';
+

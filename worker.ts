@@ -63,14 +63,24 @@ export default {
         const res = await env.DB.prepare(
           'SELECT * FROM tasks WHERE status = "active" ORDER BY created_at DESC'
         ).all();
-        const tasks = (res.results || []).map((t: any) => ({
-          ...t,
-          is_active: t.status === 'active',
-          is_top_offer: Boolean(t.is_top_offer),
-          is_trending: Boolean(t.is_trending),
-          is_admin_created: true,
-          instructions: typeof t.instructions === 'string' ? JSON.parse(t.instructions) : (t.instructions || []),
-        }));
+        const tasks = (res.results || []).map((t: any) => {
+          let parsedInstructions = t.instructions;
+          if (typeof t.instructions === 'string') {
+            try {
+              parsedInstructions = JSON.parse(t.instructions);
+            } catch {
+              parsedInstructions = [t.instructions];
+            }
+          }
+          return {
+            ...t,
+            is_active: t.status === 'active',
+            is_top_offer: Boolean(t.is_top_offer),
+            is_trending: Boolean(t.is_trending),
+            is_admin_created: true,
+            instructions: Array.isArray(parsedInstructions) ? parsedInstructions : (t.instructions ? [t.instructions] : []),
+          };
+        });
         return json(tasks);
       } catch (e: any) {
         return json({ error: e.message }, 500);
@@ -81,14 +91,24 @@ export default {
     if (pathname === '/api/admin/tasks' && method === 'GET') {
       try {
         const res = await env.DB.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all();
-        const tasks = (res.results || []).map((t: any) => ({
-          ...t,
-          is_active: t.status === 'active',
-          is_top_offer: Boolean(t.is_top_offer),
-          is_trending: Boolean(t.is_trending),
-          is_admin_created: true,
-          instructions: typeof t.instructions === 'string' ? JSON.parse(t.instructions) : (t.instructions || []),
-        }));
+        const tasks = (res.results || []).map((t: any) => {
+          let parsedInstructions = t.instructions;
+          if (typeof t.instructions === 'string') {
+            try {
+              parsedInstructions = JSON.parse(t.instructions);
+            } catch {
+              parsedInstructions = [t.instructions];
+            }
+          }
+          return {
+            ...t,
+            is_active: t.status === 'active',
+            is_top_offer: Boolean(t.is_top_offer),
+            is_trending: Boolean(t.is_trending),
+            is_admin_created: true,
+            instructions: Array.isArray(parsedInstructions) ? parsedInstructions : (t.instructions ? [t.instructions] : []),
+          };
+        });
         return json(tasks);
       } catch (e: any) {
         return json({ error: e.message }, 500);

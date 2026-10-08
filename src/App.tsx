@@ -69,6 +69,7 @@ import {
 import { SpinWheel } from './components/SpinWheel';
 import { ScratchCard } from './components/ScratchCard';
 import { TaskModal } from './components/TaskModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { WithdrawModal } from './components/WithdrawModal';
 import { AdminPanel } from './components/AdminPanel';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
@@ -2105,7 +2106,7 @@ export default function App() {
 
                       <div className="flex items-center gap-2.5 shrink-0">
                         <span className="font-mono font-black text-emerald-600 text-base">
-                          ₹{task.reward_amount.toFixed(0)}
+                          ₹{(Number(task.reward_amount) || 0).toFixed(0)}
                         </span>
                         {submissions.some((s) => s.task_id === task.id) ? (
                           <span className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300">
@@ -2114,6 +2115,10 @@ export default function App() {
                         ) : (
                           <button
                             type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTask(task);
+                            }}
                             className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white font-black text-xs shadow-md transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
                           >
                             <span>Start Offer</span>
@@ -2224,7 +2229,7 @@ export default function App() {
 
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="font-mono font-black text-emerald-600 text-base">
-                        ₹{task.reward_amount.toFixed(0)}
+                        ₹{(Number(task.reward_amount) || 0).toFixed(0)}
                       </span>
                       {submissions.some((s) => s.task_id === task.id) ? (
                         <span className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300">
@@ -2233,6 +2238,10 @@ export default function App() {
                       ) : (
                         <button
                           type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTask(task);
+                          }}
                           className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white font-black text-xs transition-all shadow-md flex items-center gap-1.5 active:scale-95 cursor-pointer"
                         >
                           <span>Start Offer</span>
@@ -2364,10 +2373,14 @@ export default function App() {
 
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="font-mono font-black text-emerald-600 text-base">
-                        ₹{offer.reward_amount.toFixed(0)}
+                        ₹{(Number(offer.reward_amount) || 0).toFixed(0)}
                       </span>
                       <button
                         type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTask(offer);
+                        }}
                         className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#34D399] hover:to-[#10B981] text-white font-black text-xs transition-colors shadow-md"
                       >
                         Start
@@ -2838,15 +2851,20 @@ export default function App() {
       </nav>
 
       {/* TASK MODAL */}
-      <TaskModal
-        task={selectedTask}
-        existingSubmission={
-          selectedTask ? submissions.find((s) => s.task_id === selectedTask.id) : undefined
-        }
-        userPhone={user.phone}
-        onClose={() => setSelectedTask(null)}
-        onSubmitProof={handleSubmitTaskProof}
-      />
+      <ErrorBoundary
+        fallbackTitle="Offer Kholne Me Dikkat Aayi"
+        onReset={() => setSelectedTask(null)}
+      >
+        <TaskModal
+          task={selectedTask}
+          existingSubmission={
+            selectedTask ? submissions.find((s) => s.task_id === selectedTask.id) : undefined
+          }
+          userPhone={user?.phone || ''}
+          onClose={() => setSelectedTask(null)}
+          onSubmitProof={handleSubmitTaskProof}
+        />
+      </ErrorBoundary>
 
       {/* WITHDRAW MODAL */}
       {showWithdrawModal && (

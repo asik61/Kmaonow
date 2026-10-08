@@ -50,6 +50,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [userNote, setUserNote] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'guide' | 'proof'>('guide');
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
+  const [taskImgFailed, setTaskImgFailed] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -57,12 +59,19 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   if (!task) return null;
 
   // Safe normalized fallbacks to prevent crash on offer click (Bug 1 Fix)
+  const taskTitle = task.title || 'Special Task Offer';
+  const taskSubtitle = task.subtitle || 'Complete steps & earn cash';
+  const taskCategory = task.category || 'Special Task';
+  const iconLabel = task.icon_label || 'TASK';
+  const iconBg = task.icon_bg || '#059669';
+
   const rewardAmount =
     typeof task.reward_amount === 'number'
       ? task.reward_amount
       : Number(task.reward_amount) || 0;
 
-  const instructions: string[] = Array.isArray(task.instructions)
+  // Extract raw instructions safely
+  const rawInstructions: any[] = Array.isArray(task.instructions)
     ? task.instructions
     : typeof task.instructions === 'string'
     ? (() => {
@@ -79,7 +88,28 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         'Profile / Dashboard ka screenshot lein aur yahan upload karein.',
       ];
 
-  const partnerUrl = task.partner_url || 'https://google.com';
+  // Strictly normalize every instruction item into a clean string to prevent React child object crash
+  const normalizedInstructions: string[] = rawInstructions
+    .map((step) => {
+      if (typeof step === 'string') return step.trim();
+      if (step && typeof step === 'object') {
+        const val = step.text ?? step.instruction ?? step.title ?? step.desc ?? step.description ?? step.step ?? JSON.stringify(step);
+        return String(val).trim();
+      }
+      return String(step ?? '').trim();
+    })
+    .filter((s) => s.length > 0);
+
+  const instructions: string[] =
+    normalizedInstructions.length > 0
+      ? normalizedInstructions
+      : [
+          'App download aur install karein.',
+          'Apna mobile number enter karke register karein.',
+          'Profile / Dashboard ka screenshot lein aur yahan upload karein.',
+        ];
+
+  const partnerUrl = task.partner_url || 'https://play.google.com';
 
   const processFile = async (file: File) => {
     setErrorMsg(null);
@@ -106,7 +136,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   const handleGenerateSample = () => {
-    const res = generateSyntheticProofReceipt(task.title, task.reward_amount, userPhone);
+    const res = generateSyntheticProofReceipt(task.title || 'Task Verification', rewardAmount, userPhone || '9876543210');
     setCompressed(res);
     setErrorMsg(null);
     setActiveTab('proof');
@@ -117,8 +147,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
-
-  const [verificationSuccess, setVerificationSuccess] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,14 +187,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  {task.category || 'Special Task'}
+                  {taskCategory}
                 </span>
                 <span className="text-[10px] font-bold text-slate-500 flex items-center gap-0.5">
                   <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 inline" /> Verified Offer
                 </span>
               </div>
               <h1 className="text-sm sm:text-base font-black text-slate-900 leading-tight truncate max-w-[200px] sm:max-w-sm">
-                {task.title}
+                {taskTitle}
               </h1>
             </div>
           </div>
@@ -200,25 +228,26 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           {/* ========================================================= */}
           <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center gap-3.5">
-              {task.image_url ? (
+              {task.image_url && !taskImgFailed ? (
                 <img
                   src={task.image_url}
-                  alt={task.title}
+                  alt={taskTitle}
+                  onError={() => setTaskImgFailed(true)}
                   className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shadow-md shrink-0 border-2 border-emerald-100 bg-white"
                 />
               ) : (
                 <div
-                  style={{ backgroundColor: task.icon_bg || '#059669' }}
+                  style={{ backgroundColor: iconBg }}
                   className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center font-black text-lg text-white shadow-md shrink-0 border-2 border-white/50"
                 >
-                  {task.icon_label}
+                  {iconLabel}
                 </div>
               )}
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg sm:text-xl font-black text-slate-900 leading-tight">
-                  {task.title}
+                  {taskTitle}
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">{task.subtitle}</p>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">{taskSubtitle}</p>
                 <div className="flex items-center gap-2 mt-1 text-[11px] text-emerald-700 font-bold">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <span>100% Genuine Payment • Direct Wallet Transfer</span>
@@ -389,13 +418,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       `Aapka proof receive ho chuka hai. Admin review complete hote hi ₹${rewardAmount.toFixed(2)} wallet me credit ho jayega.`}
                   </p>
 
-                  {existingSubmission.proof_screenshot_url && (
+                  {(existingSubmission.proof_screenshot_url || existingSubmission.proof_file_id) && (
                     <div className="pt-1">
                       <div className="text-xs font-bold text-slate-500 mb-2">Aapka Bheja Hua Screenshot:</div>
                       <img
-                        src={existingSubmission.proof_screenshot_url}
+                        src={existingSubmission.proof_screenshot_url || existingSubmission.proof_file_id}
                         alt="Submitted Proof"
-                        className="w-40 h-56 object-cover rounded-2xl border-2 border-slate-200 shadow-md"
+                        className="w-40 h-56 object-cover rounded-2xl border-2 border-slate-200 shadow-md bg-white"
                       />
                     </div>
                   )}
@@ -571,7 +600,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 rel="noopener noreferrer"
                 className="flex-1 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-emerald-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md active:scale-98 transition-all cursor-pointer"
               >
-                <span>👉 Start Offer (Open {task.title})</span>
+                <span>👉 Start Offer (Open {taskTitle})</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
 

@@ -127,10 +127,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const res = await env.DB.prepare(
         'SELECT * FROM tasks WHERE status = "active" ORDER BY created_at DESC'
       ).all();
-      const tasks = (res.results || []).map((t: any) => ({
-        ...t,
-        instructions: typeof t.instructions === 'string' ? JSON.parse(t.instructions) : t.instructions,
-      }));
+      const tasks = (res.results || []).map((t: any) => {
+        let parsedInstructions = t.instructions;
+        if (typeof t.instructions === 'string') {
+          try {
+            parsedInstructions = JSON.parse(t.instructions);
+          } catch {
+            parsedInstructions = [t.instructions];
+          }
+        }
+        return {
+          ...t,
+          instructions: Array.isArray(parsedInstructions) ? parsedInstructions : (t.instructions ? [t.instructions] : []),
+        };
+      });
       return json(tasks);
     } catch (e: any) {
       return json({ error: e.message }, 500);

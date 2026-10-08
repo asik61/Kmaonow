@@ -181,7 +181,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_USER;
   });
 
-  const [showSplash, setShowSplash] = useState<boolean>(true);
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    return !sessionStorage.getItem('kamao_splash_shown');
+  });
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
     return !!localStorage.getItem('kamaonow_user');
   });
@@ -1592,7 +1594,14 @@ export default function App() {
   });
 
   if (showSplash) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+    return (
+      <SplashScreen
+        onFinish={() => {
+          sessionStorage.setItem('kamao_splash_shown', 'true');
+          setShowSplash(false);
+        }}
+      />
+    );
   }
 
   if (!isLoggedIn) {

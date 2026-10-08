@@ -46,12 +46,12 @@ export default {
       });
     }
 
-    // App Version & Real-Time Auto-Update
+    // App Version & Real-Time Auto-Update (Stable buildId to prevent reload loop)
     if (pathname === '/api/version') {
       const res = json({
-        version: '2.5.0',
-        buildId: 'kamaonow-build-' + Date.now(),
-        timestamp: Date.now(),
+        version: '2.5.1',
+        buildId: 'kamaonow-v2.5.1',
+        timestamp: 1728374400000,
       });
       res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
       return res;

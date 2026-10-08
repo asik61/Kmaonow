@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ShieldCheck, Zap, Gift } from 'lucide-react';
 import { RealMoneyHeroSquircleIcon } from './Illustrations3D';
 
@@ -7,13 +7,17 @@ interface SplashScreenProps {
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
-  const [progress, setProgress] = useState(25);
+  const [progress, setProgress] = useState(30);
+  const onFinishRef = useRef(onFinish);
+  onFinishRef.current = onFinish;
 
   useEffect(() => {
-    const t1 = setTimeout(() => setProgress(55), 400);
-    const t2 = setTimeout(() => setProgress(85), 900);
-    const t3 = setTimeout(() => setProgress(100), 1400);
-    const t4 = setTimeout(() => onFinish(), 1800);
+    const t1 = setTimeout(() => setProgress(65), 250);
+    const t2 = setTimeout(() => setProgress(90), 550);
+    const t3 = setTimeout(() => setProgress(100), 850);
+    const t4 = setTimeout(() => {
+      onFinishRef.current?.();
+    }, 1100);
 
     return () => {
       clearTimeout(t1);
@@ -21,7 +25,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       clearTimeout(t3);
       clearTimeout(t4);
     };
-  }, [onFinish]);
+  }, []); // Run only once on mount!
+
+  const handleManualSkip = () => {
+    onFinishRef.current?.();
+  };
 
   return (
     <div className="fixed inset-0 z-[9999] w-screen h-screen min-h-[100dvh] max-h-[100dvh] flex flex-col items-center justify-between bg-[#FAFDFB] text-slate-900 select-none overflow-hidden animate-fade-in">
@@ -60,7 +68,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         {/* Skip button for quick testing */}
         <button
           type="button"
-          onClick={onFinish}
+          onClick={handleManualSkip}
           className="text-xs text-slate-400 hover:text-emerald-700 font-semibold px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer mt-1"
         >
           Skip &rarr;

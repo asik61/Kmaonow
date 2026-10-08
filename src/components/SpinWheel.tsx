@@ -757,7 +757,7 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
               <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold space-y-0.5">
                 <div>✓ Seedha Aapke Wallet Me Credit Ho Gaya!</div>
                 <div className="text-sm font-black font-mono text-emerald-700">
-                  Total Wallet: ₹{(walletBalance + wonSegment.value).toFixed(2)}
+                  Total Wallet: ₹{walletBalance.toFixed(2)}
                 </div>
               </div>
               <p className="text-xs text-slate-500 font-medium pt-1">

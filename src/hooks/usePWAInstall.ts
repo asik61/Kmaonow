@@ -117,18 +117,7 @@ export function usePWAInstall() {
   };
 
   const install = async (): Promise<boolean> => {
-    let promptToUse = deferredPrompt || (typeof window !== 'undefined' ? window.__pwa_prompt : null);
-
-    // If prompt is not ready yet, wait briefly (up to 1.2s) in case it's initializing
-    if (!promptToUse && typeof window !== 'undefined' && !checkIsPWAInstalled()) {
-      for (let i = 0; i < 5; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 240));
-        if (window.__pwa_prompt || deferredPrompt) {
-          promptToUse = deferredPrompt || window.__pwa_prompt;
-          break;
-        }
-      }
-    }
+    const promptToUse = deferredPrompt || (typeof window !== 'undefined' ? window.__pwa_prompt : null);
 
     if (!promptToUse) {
       return false;

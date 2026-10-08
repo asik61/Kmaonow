@@ -632,6 +632,12 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
               <div className="text-5xl font-black text-emerald-600 py-1 font-mono">
                 {currentPrize.label}
               </div>
+              <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold space-y-0.5">
+                <div>✓ Seedha Aapke Wallet Me Credit Ho Gaya!</div>
+                <div className="text-sm font-black font-mono text-emerald-700">
+                  Total Wallet: ₹{walletBalance.toFixed(2)}
+                </div>
+              </div>
               <p className="text-xs text-slate-500 font-medium">
                 {freeScratchesLeft - 1 > 0
                   ? `Wallet me credit ho gaya! (${freeScratchesLeft - 1} cards abhi baaki hain)`

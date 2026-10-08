@@ -652,67 +652,32 @@ export default function App() {
 
   // Spin Reward Won (Daily 3 Free Spins — D1 server-side validated)
   const handleSpinWon = async (amount: number) => {
-    // Pehle server se check karo (D1 database se — localStorage bypass proof)
-    try {
-      const res = await fetch('/api/spin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, amount }),
-      });
-      const data = await res.json() as { ok: boolean; error?: string; limitReached?: boolean; remaining?: number; usedToday?: number };
-
-      if (!data.ok) {
-        if (data.limitReached) {
-          // Server ne block kiya — localStorage bhi sync karo
-          setFreeSpinsLeft(0);
-          setDailySpinClaimed(true);
-          const today = new Date().toISOString().slice(0, 10);
-          localStorage.setItem('realmoney_spin_date', today);
-          localStorage.setItem('realmoney_spins_count', '3');
-          showToast('❌ Aaj ke 3 spins already use ho chuke hain! (Server verified)');
-        } else {
-          showToast('Spin record nahi hua, try again.');
-        }
-        return;
-      }
-
-      // Server se confirmed — ab UI update karo
-      const remaining = data.remaining ?? 0;
-      const newUsed = data.usedToday ?? 3;
-      const today = new Date().toISOString().slice(0, 10);
-      localStorage.setItem('realmoney_spin_date', today);
-      localStorage.setItem('realmoney_spins_count', String(newUsed));
-      setFreeSpinsLeft(remaining);
-      if (remaining <= 0) setDailySpinClaimed(true);
-
-    } catch {
-      // Server unreachable — fallback to localStorage (offline mode)
-      const today = new Date().toISOString().slice(0, 10);
-      const savedDate = localStorage.getItem('realmoney_spin_date');
-      let usedToday = 0;
-      if (savedDate === today) {
-        usedToday = parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10);
-      }
-      if (usedToday >= 3) {
-        showToast('❌ Aaj ke 3 spins use ho chuke hain!');
-        return;
-      }
-      const newUsed = usedToday + 1;
-      localStorage.setItem('realmoney_spin_date', today);
-      localStorage.setItem('realmoney_spins_count', String(newUsed));
-      const remaining = Math.max(0, 3 - newUsed);
-      setFreeSpinsLeft(remaining);
-      if (remaining <= 0) setDailySpinClaimed(true);
-    }
-
-    // Wallet + Ledger update
+    // 1. Instant local wallet + ledger credit so user NEVER misses their money
     const today = new Date().toISOString().slice(0, 10);
-    const newUsed = parseInt(localStorage.getItem('realmoney_spins_count') || '1', 10);
-    setWallet((prev) => ({
-      ...prev,
-      available_balance: Number((prev.available_balance + amount).toFixed(2)),
-      lifetime_earned: Number((prev.lifetime_earned + amount).toFixed(2)),
-    }));
+    const savedDate = localStorage.getItem('realmoney_spin_date');
+    let usedToday = 0;
+    if (savedDate === today) {
+      usedToday = parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10);
+    }
+    const newUsed = Math.min(3, usedToday + 1);
+    localStorage.setItem('realmoney_spin_date', today);
+    localStorage.setItem('realmoney_spins_count', String(newUsed));
+    const remainingLocal = Math.max(0, 3 - newUsed);
+    setFreeSpinsLeft(remainingLocal);
+    if (remainingLocal <= 0) setDailySpinClaimed(true);
+
+    // Credit to state and persist immediately
+    setWallet((prev) => {
+      const nextWallet = {
+        ...prev,
+        available_balance: Number((prev.available_balance + amount).toFixed(2)),
+        lifetime_earned: Number((prev.lifetime_earned + amount).toFixed(2)),
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem('kamaonow_wallet', JSON.stringify(nextWallet));
+      return nextWallet;
+    });
+
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
       user_id: user.id,
@@ -722,77 +687,65 @@ export default function App() {
       description: `Daily Lucky Spin #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
-    setLedger((prev) => [newEntry, ...prev]);
-    const remaining = Math.max(0, 3 - newUsed);
-    if (remaining > 0) {
-      showToast(`+₹${amount.toFixed(2)} credited! Abhi ${remaining}/3 free spins baaki hain. 🎯`);
+    setLedger((prev) => {
+      const nextLedger = [newEntry, ...prev];
+      localStorage.setItem('kamaonow_ledger', JSON.stringify(nextLedger));
+      return nextLedger;
+    });
+
+    if (remainingLocal > 0) {
+      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Abhi ${remainingLocal}/3 spins baaki hain. 🎯`);
     } else {
-      showToast(`+₹${amount.toFixed(2)} credited! Aaj ke sabhi 3 free spins complete ho gaye. 🎉`);
+      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Aaj ke 3 free spins complete ho gaye. 🎉`);
+    }
+
+    // 2. Sync asynchronously with backend / D1 database
+    try {
+      const res = await fetch('/api/spin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, amount }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { ok: boolean; remaining?: number; usedToday?: number };
+        if (data.ok && typeof data.remaining === 'number') {
+          setFreeSpinsLeft(data.remaining);
+          if (data.remaining <= 0) setDailySpinClaimed(true);
+        }
+      }
+    } catch (err) {
+      console.warn('Spin server sync skipped (offline mode):', err);
     }
   };
 
   // Scratch Reward Won (Daily 3 Free Scratch Cards — D1 server-side validated)
   const handleScratchWon = async (amount: number) => {
-    // Pehle server se check karo (D1 database se — localStorage bypass proof)
-    try {
-      const res = await fetch('/api/scratch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, amount }),
-      });
-      const data = await res.json() as { ok: boolean; error?: string; limitReached?: boolean; remaining?: number; usedToday?: number };
-
-      if (!data.ok) {
-        if (data.limitReached) {
-          // Server ne block kiya — localStorage bhi sync karo
-          setFreeScratchesLeft(0);
-          setDailyScratchClaimed(true);
-          const today = new Date().toISOString().slice(0, 10);
-          localStorage.setItem('realmoney_scratch_date', today);
-          localStorage.setItem('realmoney_scratch_count', '3');
-          showToast('❌ Aaj ke 3 scratch cards already use ho chuke hain! (Server verified)');
-        } else {
-          showToast('Scratch record nahi hua, try again.');
-        }
-        return;
-      }
-
-      // Server se confirmed — ab UI update karo
-      const remaining = data.remaining ?? 0;
-      const newUsed = data.usedToday ?? 3;
-      const today = new Date().toISOString().slice(0, 10);
-      localStorage.setItem('realmoney_scratch_date', today);
-      localStorage.setItem('realmoney_scratch_count', String(newUsed));
-      setFreeScratchesLeft(remaining);
-      if (remaining <= 0) setDailyScratchClaimed(true);
-
-    } catch {
-      // Server unreachable — fallback to localStorage (offline mode)
-      const today = new Date().toISOString().slice(0, 10);
-      const savedDate = localStorage.getItem('realmoney_scratch_date');
-      let usedToday = 0;
-      if (savedDate === today) {
-        usedToday = parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10);
-      }
-      if (usedToday >= 3) {
-        showToast('❌ Aaj ke 3 scratch cards use ho chuke hain!');
-        return;
-      }
-      const newUsed = usedToday + 1;
-      localStorage.setItem('realmoney_scratch_date', today);
-      localStorage.setItem('realmoney_scratch_count', String(newUsed));
-      const remaining = Math.max(0, 3 - newUsed);
-      setFreeScratchesLeft(remaining);
-      if (remaining <= 0) setDailyScratchClaimed(true);
+    // 1. Instant local wallet + ledger credit so user NEVER misses their money
+    const today = new Date().toISOString().slice(0, 10);
+    const savedDate = localStorage.getItem('realmoney_scratch_date');
+    let usedToday = 0;
+    if (savedDate === today) {
+      usedToday = parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10);
     }
+    const newUsed = Math.min(3, usedToday + 1);
+    localStorage.setItem('realmoney_scratch_date', today);
+    localStorage.setItem('realmoney_scratch_count', String(newUsed));
+    const remainingLocal = Math.max(0, 3 - newUsed);
+    setFreeScratchesLeft(remainingLocal);
+    if (remainingLocal <= 0) setDailyScratchClaimed(true);
 
-    // Wallet + Ledger update
-    const newUsed = parseInt(localStorage.getItem('realmoney_scratch_count') || '1', 10);
-    setWallet((prev) => ({
-      ...prev,
-      available_balance: Number((prev.available_balance + amount).toFixed(2)),
-      lifetime_earned: Number((prev.lifetime_earned + amount).toFixed(2)),
-    }));
+    // Credit to state and persist immediately
+    setWallet((prev) => {
+      const nextWallet = {
+        ...prev,
+        available_balance: Number((prev.available_balance + amount).toFixed(2)),
+        lifetime_earned: Number((prev.lifetime_earned + amount).toFixed(2)),
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem('kamaonow_wallet', JSON.stringify(nextWallet));
+      return nextWallet;
+    });
+
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
       user_id: user.id,
@@ -802,12 +755,34 @@ export default function App() {
       description: `Daily Scratch Card #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
-    setLedger((prev) => [newEntry, ...prev]);
-    const remaining = Math.max(0, 3 - newUsed);
-    if (remaining > 0) {
-      showToast(`+₹${amount.toFixed(2)} credited! Abhi ${remaining}/3 scratch cards baaki hain. 🎁`);
+    setLedger((prev) => {
+      const nextLedger = [newEntry, ...prev];
+      localStorage.setItem('kamaonow_ledger', JSON.stringify(nextLedger));
+      return nextLedger;
+    });
+
+    if (remainingLocal > 0) {
+      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Abhi ${remainingLocal}/3 cards baaki hain. 🎁`);
     } else {
-      showToast(`+₹${amount.toFixed(2)} credited! Aaj ke sabhi 3 scratch cards complete ho gaye. 🎉`);
+      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Aaj ke 3 scratch cards complete ho gaye. 🎉`);
+    }
+
+    // 2. Sync asynchronously with backend / D1 database
+    try {
+      const res = await fetch('/api/scratch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, amount }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { ok: boolean; remaining?: number; usedToday?: number };
+        if (data.ok && typeof data.remaining === 'number') {
+          setFreeScratchesLeft(data.remaining);
+          if (data.remaining <= 0) setDailyScratchClaimed(true);
+        }
+      }
+    } catch (err) {
+      console.warn('Scratch server sync skipped (offline mode):', err);
     }
   };
 
@@ -2131,6 +2106,7 @@ export default function App() {
               freeSpinsLeft={freeSpinsLeft}
               totalDailySpins={3}
               dailyClaimed={dailySpinClaimed || freeSpinsLeft <= 0}
+              walletBalance={wallet.available_balance}
               onRewardWon={handleSpinWon}
               onBack={() => navigateTo('home')}
               onOpenRules={() => setShowRulesModal(true)}
@@ -2149,6 +2125,7 @@ export default function App() {
               freeScratchesLeft={freeScratchesLeft}
               totalDailyScratches={3}
               dailyClaimed={dailyScratchClaimed || freeScratchesLeft <= 0}
+              walletBalance={wallet.available_balance}
               onRewardWon={handleScratchWon}
               onBack={() => navigateTo('home')}
               onOpenRules={() => setShowRulesModal(true)}

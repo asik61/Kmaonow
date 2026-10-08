@@ -96,6 +96,108 @@ export default {
       }
     }
 
+    // 3A. USER LOOKUP BY PHONE (For Re-login after Clear Data / Reinstall)
+    if (pathname.startsWith('/api/user/by-phone/') && method === 'GET') {
+      const rawPhone = pathname.split('/').pop() || '';
+      const clean = rawPhone.replace(/\D/g, '');
+      try {
+        const user = await env.DB.prepare(
+          'SELECT * FROM users WHERE phone LIKE ? OR phone LIKE ?'
+        )
+          .bind(`%${clean}%`, clean)
+          .first();
+        if (user) return json(user);
+        return json({ ok: false, error: 'User not found' }, 404);
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    // 3B. USER LOOKUP BY ID
+    if (pathname.startsWith('/api/user/') && !pathname.includes('/sync') && !pathname.includes('/by-phone') && method === 'GET') {
+      const userId = pathname.split('/').pop() || '';
+      try {
+        const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+        if (user) return json(user);
+        return json({ ok: false, error: 'User not found' }, 404);
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    // 3C. USER SYNC / UPSERT (Persistent User Database)
+    if ((pathname === '/api/user/sync' || pathname === '/api/users/upsert') && method === 'POST') {
+      try {
+        const u: any = await request.json();
+        const userId = u.id || `usr-${(u.phone || '').replace(/\D/g, '')}`;
+        const refCode = u.referral_code || `RM${(u.phone || '').slice(-4)}`;
+        await env.DB.prepare(
+          `INSERT INTO users (id, name, phone, email, referral_code, referred_by, is_blocked, is_verified, role)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             name = excluded.name,
+             phone = COALESCE(excluded.phone, users.phone),
+             email = COALESCE(excluded.email, users.email)`
+        )
+          .bind(
+            userId,
+            u.name || 'User',
+            u.phone || null,
+            u.email || null,
+            refCode,
+            u.referred_by || null,
+            u.is_blocked ? 1 : 0,
+            u.is_verified ? 1 : 0,
+            u.role || 'user'
+          )
+          .run();
+
+        // Also ensure wallet exists in D1
+        let wallet = await env.DB.prepare('SELECT * FROM wallets WHERE user_id = ?').bind(userId).first();
+        if (!wallet) {
+          await env.DB.prepare(
+            'INSERT INTO wallets (id, user_id, available_balance, pending_balance, lifetime_earned, lifetime_withdrawn) VALUES (?, ?, 0, 0, 0, 0)'
+          )
+            .bind(`wal-${userId}`, userId)
+            .run();
+        }
+
+        return json({ ok: true, userId });
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    // 3D. USER SUBMISSIONS (Persistent Task Proofs)
+    if (pathname.startsWith('/api/submissions/') && method === 'GET') {
+      const userId = pathname.split('/').pop() || '';
+      try {
+        const res = await env.DB.prepare(
+          'SELECT * FROM task_submissions WHERE user_id = ? ORDER BY submitted_at DESC'
+        )
+          .bind(userId)
+          .all();
+        return json(res.results || []);
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    // 3E. USER WITHDRAWALS (Persistent Payout History)
+    if (pathname.startsWith('/api/withdrawals/') && method === 'GET') {
+      const userId = pathname.split('/').pop() || '';
+      try {
+        const res = await env.DB.prepare(
+          'SELECT * FROM withdrawals WHERE user_id = ? ORDER BY requested_at DESC'
+        )
+          .bind(userId)
+          .all();
+        return json(res.results || []);
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
     // 4. GET LEDGER FOR USER
     if (pathname.startsWith('/api/ledger/') && method === 'GET') {
       const userId = pathname.split('/').pop() || 'usr-demo-001';

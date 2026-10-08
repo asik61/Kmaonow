@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Home,
   CheckSquare,
@@ -187,6 +187,7 @@ export default function App() {
     const saved = localStorage.getItem('kamaonow_user');
     return saved ? JSON.parse(saved) : INITIAL_USER;
   });
+  const [avatarImgError, setAvatarImgError] = useState(false);
 
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     return !sessionStorage.getItem('kamao_splash_shown');
@@ -400,8 +401,9 @@ export default function App() {
       })
       .catch(console.warn);
 
-    // If user is already logged in, sync their real data from D1 database
-    if (user.id) {
+    // Bug 6 Fix: Only sync from D1 if user is ACTUALLY logged in and not the default unauthenticated demo user
+    const hasLoggedInUser = !!localStorage.getItem('kamaonow_user');
+    if (hasLoggedInUser && user?.id && user.id !== 'usr-rohan-01') {
       loadUserDataFromD1(user.id);
     }
   }, []);
@@ -593,6 +595,9 @@ export default function App() {
   // ─── navigateTo: tab change + URL update + title update ───────────────────
   const navigateTo = (tab: NavTab) => {
     setActiveTab(tab);
+    if (!isLoggedIn) {
+      setPendingTab(tab);
+    }
     const path = TAB_TO_PATH[tab];
     const title = TAB_TITLES[tab];
     // Browser URL update (back button kaam karega)
@@ -608,13 +613,16 @@ export default function App() {
     const handlePopState = (e: PopStateEvent) => {
       const tab = (e.state?.tab as NavTab) || getTabFromPath();
       setActiveTab(tab);
+      if (!isLoggedIn) {
+        setPendingTab(tab);
+      }
       document.title = TAB_TITLES[tab];
     };
     window.addEventListener('popstate', handlePopState);
     // Initial state set karo taaki back button pehle page pe bhi kaam kare
     window.history.replaceState({ tab: activeTab }, document.title, TAB_TO_PATH[activeTab]);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [isLoggedIn]);
 
   // Title initial set
   useEffect(() => {
@@ -626,10 +634,23 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Submit Task Proof
+  // Submit Task Proof (Bug 5 Fix: Prevent duplicate task submission)
   const handleSubmitTaskProof = (payload: { taskId: string; proofDataUrl: string; sizeKb: number }) => {
     const targetTask = tasks.find((t) => t.id === payload.taskId);
     if (!targetTask) return;
+
+    // Check for existing pending or approved submission to prevent double submission & duplicate credit
+    const existing = submissions.find(
+      (s) => s.user_id === user.id && s.task_id === payload.taskId && (s.status === 'pending' || s.status === 'approved')
+    );
+    if (existing) {
+      showToast(
+        existing.status === 'approved'
+          ? 'Yeh task aap pehle hi complete kar chuke hain! ✅'
+          : 'Yeh task pehle se review me laga hua hai! ⏳'
+      );
+      return;
+    }
 
     const newSub: TaskSubmission = {
       id: `sub-${Date.now()}`,
@@ -646,10 +667,10 @@ export default function App() {
       submitted_at: new Date().toISOString(),
     };
 
-    setSubmissions([newSub, ...submissions]);
+    setSubmissions((prev) => [newSub, ...prev]);
     setWallet((prev) => ({
       ...prev,
-      pending_balance: prev.pending_balance + targetTask.reward_amount,
+      pending_balance: Number((prev.pending_balance + targetTask.reward_amount).toFixed(2)),
     }));
     // D1 mein bhi submit karo
     fetch(`/api/tasks/${targetTask.id}/submit`, {
@@ -814,42 +835,54 @@ export default function App() {
     }
   };
 
-  // Daily Bonus
-  const handleClaimDailyBonus = () => {
-    if (dailyBonusClaimed) return;
+  // Daily Bonus (Bug 7 Fix: Prevent double credit and handle server response safely)
+  const isClaimingDailyBonus = useRef(false);
+  const handleClaimDailyBonus = async () => {
+    if (dailyBonusClaimed || isClaimingDailyBonus.current) return;
+    isClaimingDailyBonus.current = true;
     const bonus = 0.50;
-    setDailyBonusClaimed(true);
-    localStorage.setItem('kamaonow_daily_date', new Date().toISOString().slice(0, 10));
-    // D1 mein bhi save karo
-    fetch('/api/daily-bonus', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, amount: bonus }),
-    }).then(async (res) => {
-      const data = await res.json() as { ok: boolean; error?: string };
-      if (!data.ok && data.error === 'Already claimed today') {
-        // Server ne block kiya — UI revert karo
-        setDailyBonusClaimed(true);
+
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      setDailyBonusClaimed(true);
+      localStorage.setItem('kamaonow_daily_date', today);
+
+      const res = await fetch('/api/daily-bonus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, amount: bonus }),
+      });
+
+      const data = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; error?: string };
+      if (!data.ok) {
+        if (data.error === 'Already claimed today') {
+          showToast('Aaj ka daily bonus pehle se claimed hai!');
+          return;
+        }
       }
-    }).catch(console.warn);
 
-    setWallet((prev) => ({
-      ...prev,
-      available_balance: Number((prev.available_balance + bonus).toFixed(2)),
-      lifetime_earned: Number((prev.lifetime_earned + bonus).toFixed(2)),
-    }));
+      setWallet((prev) => ({
+        ...prev,
+        available_balance: Number((prev.available_balance + bonus).toFixed(2)),
+        lifetime_earned: Number((prev.lifetime_earned + bonus).toFixed(2)),
+      }));
 
-    const newEntry: LedgerItem = {
-      id: `led-${Date.now()}`,
-      user_id: user.id,
-      type: 'daily_bonus',
-      amount: bonus,
-      status: 'credit',
-      description: 'Roz ka Daily Bonus: ₹0.50',
-      created_at: new Date().toISOString(),
-    };
-    setLedger([newEntry, ...ledger]);
-    showToast('Roz ka Bonus: ₹0.50 credited!');
+      const newEntry: LedgerItem = {
+        id: `led-${Date.now()}`,
+        user_id: user.id,
+        type: 'daily_bonus',
+        amount: bonus,
+        status: 'credit',
+        description: 'Roz ka Daily Bonus: ₹0.50',
+        created_at: new Date().toISOString(),
+      };
+      setLedger((prev) => [newEntry, ...prev]);
+      showToast('Roz ka Bonus: ₹0.50 credited! 🎉');
+    } catch (err) {
+      console.warn('Daily bonus credit error:', err);
+    } finally {
+      isClaimingDailyBonus.current = false;
+    }
   };
 
   // Withdrawal Request
@@ -907,7 +940,7 @@ export default function App() {
       requested_at: new Date().toISOString(),
     };
 
-    setWithdrawals([newWdr, ...withdrawals]);
+    setWithdrawals((prev) => [newWdr, ...prev]);
     setWallet((prev) => ({
       ...prev,
       available_balance: Number((prev.available_balance - payload.amount).toFixed(2)),
@@ -936,7 +969,7 @@ export default function App() {
       description: `Withdrawal request via ${payload.method} (${payload.upiId || payload.bankAccount})`,
       created_at: new Date().toISOString(),
     };
-    setLedger([newEntry, ...ledger]);
+    setLedger((prev) => [newEntry, ...prev]);
 
     // In-App Notification
     const newNotif: InAppNotification = {
@@ -1245,7 +1278,7 @@ export default function App() {
     showToast(`Withdrawal rejected. ₹${wdr.amount.toFixed(2)} refunded to wallet.`);
   };
 
-  // Admin panel open hone pe D1 se fresh data load karo
+  // Admin panel open hone pe D1 se fresh data load karo (Bug 8 Fix: useEffect instead of inline JSX render IIFE)
   const loadAdminDataFromD1 = async () => {
     try {
       const [subsRes, wdrsRes, usersRes] = await Promise.all([
@@ -1260,6 +1293,12 @@ export default function App() {
       console.warn('Admin D1 load failed:', e);
     }
   };
+
+  useEffect(() => {
+    if (showAdminPanel) {
+      loadAdminDataFromD1();
+    }
+  }, [showAdminPanel]);
 
   const handleAdminSaveTask = async (taskData: Partial<TaskItem>) => {
     let taskToSave: TaskItem;
@@ -1361,17 +1400,26 @@ export default function App() {
   };
 
   const handleAdminToggleUserBlock = (userId: string) => {
+    const target = allUsers.find((u) => u.id === userId);
+    const newBlockedState = target ? !target.is_blocked : true;
+
     setAllUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, is_blocked: !u.is_blocked } : u))
+      prev.map((u) => (u.id === userId ? { ...u, is_blocked: newBlockedState } : u))
     );
     if (userId === user.id) {
-      setUser((prev) => ({ ...prev, is_blocked: !prev.is_blocked }));
+      setUser((prev) => ({ ...prev, is_blocked: newBlockedState }));
     }
-    const target = allUsers.find((u) => u.id === userId);
+
+    // Bug 2 Fix: Save block status to Cloudflare D1
+    fetch(`/api/admin/users/${userId}/toggle-block`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(console.warn);
+
     showToast(
-      target?.is_blocked
-        ? `Account ${target?.name} Unblocked! ✓`
-        : `Account ${target?.name} Blocked / Banned! 🚫`
+      newBlockedState
+        ? `Account ${target?.name || 'User'} Blocked / Banned! 🚫`
+        : `Account ${target?.name || 'User'} Unblocked! ✓`
     );
   };
 
@@ -1410,6 +1458,13 @@ export default function App() {
       }));
     }
 
+    // Bug 3 Fix: Save balance adjustment to D1
+    fetch(`/api/admin/users/${userId}/adjust`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, note }),
+    }).catch(console.warn);
+
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
       user_id: userId,
@@ -1438,13 +1493,15 @@ export default function App() {
   };
 
   const handleAdminSaveNotice = (noticeData: Partial<BroadcastNotice>) => {
+    let savedNotice: BroadcastNotice;
     if (noticeData.id) {
+      savedNotice = noticeData as BroadcastNotice;
       setNotices((prev) =>
         prev.map((n) => (n.id === noticeData.id ? ({ ...n, ...noticeData } as BroadcastNotice) : n))
       );
       showToast('Broadcast notice updated! 📢');
     } else {
-      const newNotice: BroadcastNotice = {
+      savedNotice = {
         id: `notice-${Date.now()}`,
         title: noticeData.title || '📢 Announcement',
         message: noticeData.message || '',
@@ -1453,13 +1510,13 @@ export default function App() {
         created_at: new Date().toISOString(),
         author: 'Admin Ops Desk',
       };
-      setNotices([newNotice, ...notices]);
+      setNotices((prev) => [savedNotice, ...prev]);
 
       // Push notification & In-App notification to users
       const newNotif: InAppNotification = {
         id: `notif-broadcast-${Date.now()}`,
-        title: newNotice.title,
-        message: newNotice.message,
+        title: savedNotice.title,
+        message: savedNotice.message,
         type: 'system',
         timestamp: new Date().toISOString(),
         read: false,
@@ -1467,16 +1524,25 @@ export default function App() {
       };
       setNotifications((prev) => [newNotif, ...prev]);
 
-      sendOutPushNotification(`Real Money App: ${newNotice.title}`, {
-        body: newNotice.message,
+      sendOutPushNotification(`Real Money App: ${savedNotice.title}`, {
+        body: savedNotice.message,
       }).catch(console.warn);
 
       showToast('Broadcast message sent to all users! 📢');
     }
+
+    // Bug 13 Fix: Save notice to Cloudflare D1
+    fetch('/api/admin/notices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(savedNotice),
+    }).catch(console.warn);
   };
 
   const handleAdminDeleteNotice = (noticeId: string) => {
     setNotices((prev) => prev.filter((n) => n.id !== noticeId));
+    // Bug 17 Fix: Delete notice in D1
+    fetch(`/api/admin/notices/${noticeId}`, { method: 'DELETE' }).catch(console.warn);
     showToast('Notice deleted.');
   };
 
@@ -1484,6 +1550,8 @@ export default function App() {
     setNotices((prev) =>
       prev.map((n) => (n.id === noticeId ? { ...n, is_active: !n.is_active } : n))
     );
+    // Bug 17 Fix: Toggle notice active in D1
+    fetch(`/api/admin/notices/${noticeId}/toggle`, { method: 'POST' }).catch(console.warn);
     showToast('Notice status updated.');
   };
 
@@ -1491,24 +1559,53 @@ export default function App() {
     const targetUser = allUsers.find((u) => u.id === userId);
     const targetName = targetUser?.name || 'User';
 
+    const personalNotif: InAppNotification = {
+      id: `notif-dm-${Date.now()}`,
+      title,
+      message,
+      type: 'system',
+      timestamp: new Date().toISOString(),
+      read: false,
+      actionTab: 'home',
+    };
+
     if (userId === user.id) {
-      const personalNotif: InAppNotification = {
-        id: `notif-dm-${Date.now()}`,
-        title,
-        message,
-        type: 'system',
-        timestamp: new Date().toISOString(),
-        read: false,
-        actionTab: 'home',
-      };
       setNotifications((prev) => [personalNotif, ...prev]);
     }
+
+    // Bug 14 Fix: Save direct message notice targeted to userId in D1 so recipient receives it
+    const targetedNotice: BroadcastNotice = {
+      id: `notice-dm-${Date.now()}`,
+      title,
+      message,
+      type: 'info',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      author: 'Admin Support',
+      target_user_id: userId,
+    };
+    setNotices((prev) => [targetedNotice, ...prev]);
+
+    // Save targeted notice to D1
+    fetch('/api/admin/notices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(targetedNotice),
+    }).catch(console.warn);
+
+    // Save to user's targeted local cache
+    try {
+      const userNotifsKey = `realmoney_notifications_${userId}`;
+      const existingUserNotifs = JSON.parse(localStorage.getItem(userNotifsKey) || '[]');
+      existingUserNotifs.unshift(personalNotif);
+      localStorage.setItem(userNotifsKey, JSON.stringify(existingUserNotifs));
+    } catch {}
 
     sendOutPushNotification(`Real Money App: ${title}`, {
       body: message,
     }).catch(console.warn);
 
-    showToast(`Notification sent to ${targetName}! ✉️`);
+    showToast(`Direct message sent to ${targetName}! ✉️`);
   };
 
   const handleResetSeed = () => {
@@ -2421,8 +2518,19 @@ export default function App() {
             {/* User Profile Card -> CRISP WHITE */}
             <div className="p-5 rounded-3xl bg-white border border-slate-100 flex items-center justify-between gap-4 shadow-md text-slate-900">
               <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-100 shrink-0 shadow-sm">
-                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-100 shrink-0 shadow-sm flex items-center justify-center">
+                  {user.avatar_url && !avatarImgError ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={user.name}
+                      onError={() => setAvatarImgError(true)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xl shadow-inner">
+                      {(user.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h2 className="text-base font-black text-slate-900">{user.name}</h2>
@@ -2443,23 +2551,23 @@ export default function App() {
               </button>
             </div>
 
-            {/* Stats Row -> 3 CRISP WHITE CARDS */}
+            {/* Stats Row -> 3 CRISP WHITE CARDS (Bug 11 Fix: Real 100% Genuine User Stats) */}
             <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-emerald-600 text-lg">
-                  {submissions.filter((s) => s.status === 'approved').length + 11}
+                  {submissions.filter((s) => s.user_id === user.id && s.status === 'approved').length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Completed Tasks</div>
               </div>
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-amber-500 text-lg">
-                  {referrals.length + 2}
+                  {referrals.filter((r) => r.referrer_id === user.id).length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Referrals</div>
               </div>
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-teal-600 text-lg">
-                  {withdrawals.filter((w) => w.status === 'approved').length + 1}
+                  {withdrawals.filter((w) => w.user_id === user.id && w.status === 'approved').length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Withdrawals</div>
               </div>
@@ -2842,7 +2950,6 @@ export default function App() {
       )}
 
       {/* ADMIN PANEL (PWA Manual Admin Master Control) */}
-      {showAdminPanel && (() => { loadAdminDataFromD1(); return null; })()}
       {showAdminPanel && (
         <AdminPanel
           currentUser={user}

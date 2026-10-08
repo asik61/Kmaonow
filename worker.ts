@@ -704,6 +704,125 @@ export default {
       }
     }
 
+    // 11H. ADMIN BLOCK/UNBLOCK USER (Bug 2 Fix)
+    if (pathname.startsWith('/api/admin/users/') && pathname.endsWith('/toggle-block') && method === 'POST') {
+      const parts = pathname.split('/');
+      const userId = parts[parts.length - 2];
+      try {
+        const u: any = await env.DB.prepare('SELECT is_blocked FROM users WHERE id = ?').bind(userId).first();
+        const newVal = u?.is_blocked ? 0 : 1;
+        await env.DB.prepare('UPDATE users SET is_blocked = ? WHERE id = ?').bind(newVal, userId).run();
+        return json({ ok: true, is_blocked: !!newVal });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 11I. ADMIN ADJUST BALANCE (Bug 3 Fix)
+    if (pathname.startsWith('/api/admin/users/') && pathname.endsWith('/adjust') && method === 'POST') {
+      const parts = pathname.split('/');
+      const userId = parts[parts.length - 2];
+      try {
+        const body: any = await request.json();
+        const amount = Number(body.amount);
+        const note = body.note || 'Admin adjustment';
+        await env.DB.prepare(
+          'UPDATE wallets SET available_balance = MAX(0, available_balance + ?), lifetime_earned = lifetime_earned + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?'
+        ).bind(amount, amount > 0 ? amount : 0, userId).run();
+        await env.DB.prepare(
+          'INSERT INTO ledger (id, user_id, type, amount, status, description) VALUES (?, ?, "admin_adjust", ?, ?, ?)'
+        ).bind(`led-${Date.now()}`, userId, Math.abs(amount), amount >= 0 ? 'credit' : 'debit', `Admin: ${note}`).run();
+        return json({ ok: true });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 11J. NOTICES: GET ACTIVE NOTICES
+    if (pathname === '/api/notices' && method === 'GET') {
+      try {
+        const res = await env.DB.prepare(
+          'SELECT * FROM notices WHERE is_active = 1 ORDER BY created_at DESC LIMIT 20'
+        ).all();
+        return json(res.results || []);
+      } catch (e: any) {
+        return json([]);
+      }
+    }
+
+    // 11K. NOTICES: SAVE / UPDATE NOTICE (Bug 13 Fix)
+    if (pathname === '/api/admin/notices' && method === 'POST') {
+      try {
+        const body: any = await request.json();
+        if (body.id) {
+          await env.DB.prepare(
+            'UPDATE notices SET title=?, message=?, type=?, is_active=? WHERE id=?'
+          ).bind(body.title, body.message, body.type || 'success', body.is_active !== false ? 1 : 0, body.id).run();
+        } else {
+          const id = `notice-${Date.now()}`;
+          await env.DB.prepare(
+            'INSERT INTO notices (id, title, message, type, is_active, author) VALUES (?, ?, ?, ?, ?, ?)'
+          ).bind(id, body.title, body.message, body.type || 'success', body.is_active !== false ? 1 : 0, body.author || 'Admin').run();
+        }
+        return json({ ok: true });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 11L. NOTICES: DELETE NOTICE (Bug 17 Fix)
+    if (pathname.startsWith('/api/admin/notices/') && method === 'DELETE') {
+      const noticeId = pathname.split('/').pop()!;
+      try {
+        await env.DB.prepare('DELETE FROM notices WHERE id = ?').bind(noticeId).run();
+        return json({ ok: true });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 11M. NOTICES: TOGGLE NOTICE (Bug 17 Fix)
+    if (pathname.startsWith('/api/admin/notices/') && pathname.endsWith('/toggle') && method === 'POST') {
+      const parts = pathname.split('/');
+      const noticeId = parts[parts.length - 2];
+      try {
+        const notice: any = await env.DB.prepare('SELECT is_active FROM notices WHERE id=?').bind(noticeId).first();
+        const newVal = notice?.is_active ? 0 : 1;
+        await env.DB.prepare('UPDATE notices SET is_active=? WHERE id=?').bind(newVal, noticeId).run();
+        return json({ ok: true, is_active: !!newVal });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 11N. USER UPSERT (Login sync)
+    if (pathname === '/api/users/upsert' && method === 'POST') {
+      try {
+        const body: any = await request.json();
+        const existing = await env.DB.prepare('SELECT id FROM users WHERE id=?').bind(body.id).first();
+        if (!existing) {
+          await env.DB.prepare(
+            `INSERT INTO users (id, name, email, phone, referral_code, referred_by, is_blocked)
+             VALUES (?, ?, ?, ?, ?, ?, 0)`
+          ).bind(
+            body.id, body.name, body.email || '', body.phone || '',
+            body.referral_code || '', body.referred_by || null
+          ).run();
+          await env.DB.prepare(
+            'INSERT OR IGNORE INTO wallets (id, user_id, available_balance, pending_balance, lifetime_earned, lifetime_withdrawn) VALUES (?, ?, 0, 0, 0, 0)'
+          ).bind(`wal-${body.id}`, body.id).run();
+          return json({ ok: true, isNewUser: true });
+        } else {
+          await env.DB.prepare(
+            'UPDATE users SET name=?, email=?, phone=? WHERE id=?'
+          ).bind(body.name, body.email || '', body.phone || '', body.id).run();
+          return json({ ok: true, isNewUser: false });
+        }
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
 
     // 12. FALLBACK TO STATIC ASSETS (Frontend PWA files in dist)
     if (env.ASSETS) {

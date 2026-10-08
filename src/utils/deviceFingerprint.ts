@@ -183,23 +183,58 @@ export function registerAccountOnDevice(phone: string, email?: string, name?: st
 export const setDevicePrimaryAccount = registerAccountOnDevice;
 
 /**
- * Checks if user is trying to refer their own device/code
+ * Checks if user is trying to refer their own device/code (Bug 16 Fix: Anti-Self-Referral Bypass)
  */
-export function isSelfReferralOnDevice(code: string): boolean {
+export function isSelfReferralOnDevice(code: string, userPhone?: string): boolean {
   if (!code || !code.trim()) return false;
   const cleanCode = code.trim().toUpperCase();
+  const cleanUserPhone = (userPhone || '').replace(/\D/g, '');
 
   try {
+    // 1. Check current logged in user
     const currentUserRaw = localStorage.getItem('kamaonow_user');
     if (currentUserRaw) {
       const cur = JSON.parse(currentUserRaw);
       if (cur.referral_code && cur.referral_code.toUpperCase() === cleanCode) {
         return true;
       }
+      const curPhone = (cur.phone || '').replace(/\D/g, '');
+      if (curPhone && cleanCode.includes(curPhone.slice(-4))) {
+        return true;
+      }
     }
+
+    // 2. Check primary device account
     const primary = getDevicePrimaryAccount();
-    if (primary?.phone && cleanCode.includes(primary.phone.slice(-4))) {
-      return true;
+    if (primary?.phone) {
+      const primaryPhone = primary.phone.replace(/\D/g, '');
+      if (primaryPhone && cleanCode.includes(primaryPhone.slice(-4))) {
+        return true;
+      }
+    }
+
+    // 3. Check entering phone number directly
+    if (cleanUserPhone && cleanUserPhone.length >= 4) {
+      const last4 = cleanUserPhone.slice(-4);
+      if (cleanCode.includes(last4) || cleanCode === `RM${last4}`) {
+        return true;
+      }
+    }
+
+    // 4. Check across all accounts stored on device
+    const allUsersRaw = localStorage.getItem('kamaonow_all_users');
+    if (allUsersRaw) {
+      const list = JSON.parse(allUsersRaw);
+      if (Array.isArray(list)) {
+        const isMatch = list.some((u: any) => {
+          const uCode = (u.referral_code || '').trim().toUpperCase();
+          const uPhone = (u.phone || '').replace(/\D/g, '');
+          if (uCode && uCode === cleanCode) return true;
+          if (uPhone && uPhone.length >= 4 && cleanCode.includes(uPhone.slice(-4))) return true;
+          return false;
+        });
+        if (isMatch) return true;
+      }
     }
   } catch {
     // ignore

@@ -307,7 +307,7 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     }
 
     // Self-Referral check
-    if (referralCode.trim() && isSelfReferralOnDevice(referralCode)) {
+    if (referralCode.trim() && isSelfReferralOnDevice(referralCode, cleanPhone)) {
       setError('❌ Self-Referral Blocked: Aap apna referral code use nahi kar sakte.');
       return;
     }
@@ -352,8 +352,8 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       return;
     }
 
-    // Check if OTP matches generated code or fallback test code 1234
-    if (otp !== generatedOtp && otp !== '1234') {
+    // Strictly verify OTP matches generated security code (Bug 15 Fix: Remove 1234 backdoor)
+    if (otp.trim() !== generatedOtp.trim()) {
       setError('❌ Galat OTP! Kripya upar notification me aaya hua 4-digit code enter karein.');
       return;
     }

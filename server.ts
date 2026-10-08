@@ -262,6 +262,68 @@ async function startServer() {
     res.json(db.getSnapshot().users);
   });
 
+  // Admin User toggle block
+  app.post('/api/admin/users/:id/toggle-block', (req, res) => {
+    const user = db.getSnapshot().users.find((u) => u.id === req.params.id);
+    if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+    user.is_blocked = !user.is_blocked;
+    res.json({ ok: true, is_blocked: user.is_blocked });
+  });
+
+  // Admin User adjust balance
+  app.post('/api/admin/users/:id/adjust', (req, res) => {
+    const { amount, note } = req.body;
+    const wallet = db.getWallet(req.params.id);
+    const numAmount = Number(amount) || 0;
+    wallet.available_balance = Math.max(0, Number((wallet.available_balance + numAmount).toFixed(2)));
+    if (numAmount > 0) wallet.lifetime_earned = Number((wallet.lifetime_earned + numAmount).toFixed(2));
+    wallet.updated_at = new Date().toISOString();
+    db.addLedgerEntry(req.params.id, 'admin_adjust', Math.abs(numAmount), numAmount >= 0 ? 'credit' : 'debit', `Admin: ${note || 'Adjustment'}`);
+    res.json({ ok: true });
+  });
+
+  // Admin Notices CRUD & Toggle
+  app.post('/api/admin/notices', (req, res) => {
+    const snapshot = db.getSnapshot() as any;
+    if (!snapshot.notices) snapshot.notices = [];
+    const body = req.body;
+    if (body.id) {
+      const idx = snapshot.notices.findIndex((n: any) => n.id === body.id);
+      if (idx >= 0) snapshot.notices[idx] = { ...snapshot.notices[idx], ...body };
+    } else {
+      snapshot.notices.unshift({
+        id: `notice-${Date.now()}`,
+        title: body.title || 'Notice',
+        message: body.message || '',
+        type: body.type || 'success',
+        is_active: body.is_active !== false,
+        author: body.author || 'Admin',
+        created_at: new Date().toISOString(),
+      });
+    }
+    res.json({ ok: true });
+  });
+
+  app.delete('/api/admin/notices/:id', (req, res) => {
+    const snapshot = db.getSnapshot() as any;
+    if (snapshot.notices) {
+      snapshot.notices = snapshot.notices.filter((n: any) => n.id !== req.params.id);
+    }
+    res.json({ ok: true });
+  });
+
+  app.post('/api/admin/notices/:id/toggle', (req, res) => {
+    const snapshot = db.getSnapshot() as any;
+    if (snapshot.notices) {
+      const notice = snapshot.notices.find((n: any) => n.id === req.params.id);
+      if (notice) {
+        notice.is_active = !notice.is_active;
+        return res.json({ ok: true, is_active: notice.is_active });
+      }
+    }
+    res.json({ ok: true });
+  });
+
   // User Upsert
   app.post('/api/users/upsert', (req, res) => {
     try {

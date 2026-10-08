@@ -708,6 +708,21 @@ class D1DatabaseManager {
     this.saveDatabase(this.data);
     return wdr;
   }
+
+  addLedgerEntry(userId: string, type: string, amount: number, status: 'credit' | 'debit', description: string) {
+    const entry = {
+      id: `led-${Date.now()}`,
+      user_id: userId,
+      type,
+      amount,
+      status,
+      description,
+      created_at: new Date().toISOString(),
+    };
+    this.data.ledger.unshift(entry);
+    this.saveDatabase(this.data);
+    return entry;
+  }
 }
 
 export const db = new D1DatabaseManager();

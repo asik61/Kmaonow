@@ -56,6 +56,31 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   if (!task) return null;
 
+  // Safe normalized fallbacks to prevent crash on offer click (Bug 1 Fix)
+  const rewardAmount =
+    typeof task.reward_amount === 'number'
+      ? task.reward_amount
+      : Number(task.reward_amount) || 0;
+
+  const instructions: string[] = Array.isArray(task.instructions)
+    ? task.instructions
+    : typeof task.instructions === 'string'
+    ? (() => {
+        try {
+          const parsed = JSON.parse(task.instructions);
+          return Array.isArray(parsed) ? parsed : [task.instructions];
+        } catch {
+          return [task.instructions];
+        }
+      })()
+    : [
+        'App download aur install karein.',
+        'Apna mobile number enter karke register karein.',
+        'Profile / Dashboard ka screenshot lein aur yahan upload karein.',
+      ];
+
+  const partnerUrl = task.partner_url || 'https://google.com';
+
   const processFile = async (file: File) => {
     setErrorMsg(null);
     if (!file.type.startsWith('image/')) {
@@ -150,7 +175,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             <div className="text-right">
               <span className="text-[10px] text-slate-500 font-bold block">Reward</span>
               <span className="font-mono font-black text-emerald-600 text-base sm:text-lg">
-                ₹{task.reward_amount.toFixed(0)}
+                ₹{rewardAmount.toFixed(0)}
               </span>
             </div>
             <button
@@ -209,7 +234,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   <span>Reward Amount (Cash)</span>
                 </div>
                 <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white mt-0.5">
-                  ₹{task.reward_amount.toFixed(2)}
+                  ₹{rewardAmount.toFixed(2)}
                 </div>
               </div>
 
@@ -275,7 +300,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
                 <div className="space-y-3">
                   {/* Instructions from Data */}
-                  {task.instructions.map((step, idx) => (
+                  {instructions.map((step, idx) => (
                     <div
                       key={idx}
                       className="p-4 rounded-2xl bg-white border border-slate-200/90 flex items-start gap-3 hover:border-emerald-300 transition-all shadow-xs"
@@ -294,7 +319,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   {/* Final Step: Screenshot */}
                   <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 flex items-start gap-3 shadow-xs">
                     <div className="w-8 h-8 rounded-xl bg-amber-500 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
-                      {task.instructions.length + 1}
+                      {instructions.length + 1}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs sm:text-sm font-black text-amber-900">
@@ -325,7 +350,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Admin review (15-30 mins) ke baad seedha ₹{task.reward_amount.toFixed(0)} wallet me add hoga.</span>
+                    <span>Admin review (15-30 mins) ke baad seedha ₹{rewardAmount.toFixed(0)} wallet me add hoga.</span>
                   </li>
                 </ul>
               </div>
@@ -361,7 +386,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
                   <p className="text-xs sm:text-sm text-slate-600 bg-white p-3.5 rounded-xl border border-slate-200 font-medium leading-relaxed">
                     {existingSubmission.admin_note ||
-                      `Aapka proof receive ho chuka hai. Admin review complete hote hi ₹${task.reward_amount.toFixed(2)} wallet me credit ho jayega.`}
+                      `Aapka proof receive ho chuka hai. Admin review complete hote hi ₹${rewardAmount.toFixed(2)} wallet me credit ho jayega.`}
                   </p>
 
                   {existingSubmission.proof_screenshot_url && (
@@ -518,13 +543,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     {submitting
                       ? (verificationSuccess ? '⚡ Verifying & Crediting Cash...' : 'Bheja Ja Raha Hai...')
                       : compressed
-                      ? `🚀 Submit Proof & Claim ₹${task.reward_amount.toFixed(2)}`
+                      ? `🚀 Submit Proof & Claim ₹${rewardAmount.toFixed(2)}`
                       : 'Pehle Upar Se Screenshot Select Karein 📸'}
                   </button>
 
                   <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 pt-1">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Instant Verification &amp; Direct Wallet Credit (₹{task.reward_amount.toFixed(0)})</span>
+                    <span>Instant Verification &amp; Direct Wallet Credit (₹{rewardAmount.toFixed(0)})</span>
                   </div>
                 </form>
               )}
@@ -541,7 +566,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           {activeTab === 'guide' ? (
             <>
               <a
-                href={task.partner_url}
+                href={partnerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-emerald-600 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md active:scale-98 transition-all cursor-pointer"
@@ -571,7 +596,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               </button>
 
               <a
-                href={task.partner_url}
+                href={partnerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 py-3 px-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer"

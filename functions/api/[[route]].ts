@@ -90,6 +90,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
+  // 1B. APP VERSION (Bug 4 Fix)
+  if (pathname === '/api/version' && method === 'GET') {
+    const res = json({
+      version: '2.5.1',
+      buildId: 'kamaonow-v2.5.1',
+      timestamp: 1728374400000,
+    });
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    return res;
+  }
+
+  // 1C. ADMIN STATS (Bug 4 Fix)
+  if (pathname === '/api/admin/stats' && method === 'GET') {
+    try {
+      const [usersCount, subsCount, wdrsCount, tasksCount]: any[] = await Promise.all([
+        env.DB.prepare('SELECT COUNT(*) as count FROM users').first(),
+        env.DB.prepare('SELECT COUNT(*) as count FROM task_submissions WHERE status = "pending"').first(),
+        env.DB.prepare('SELECT COUNT(*) as count FROM withdrawals WHERE status = "pending"').first(),
+        env.DB.prepare('SELECT COUNT(*) as count FROM tasks WHERE status = "active"').first(),
+      ]);
+      return json({
+        totalUsers: usersCount?.count || 0,
+        pendingSubmissions: subsCount?.count || 0,
+        pendingWithdrawals: wdrsCount?.count || 0,
+        totalActiveTasks: tasksCount?.count || 0,
+      });
+    } catch (e: any) {
+      return json({ error: e.message }, 500);
+    }
+  }
+
   // 2. GET ACTIVE TASKS
   if (pathname === '/api/tasks' && method === 'GET') {
     try {
@@ -99,6 +130,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const tasks = (res.results || []).map((t: any) => ({
         ...t,
         instructions: typeof t.instructions === 'string' ? JSON.parse(t.instructions) : t.instructions,
+      }));
+      return json(tasks);
+    } catch (e: any) {
+      return json({ error: e.message }, 500);
+    }
+  }
+
+  // 2B. GET ALL TASKS FOR ADMIN (Bug 4 Fix)
+  if (pathname === '/api/admin/tasks' && method === 'GET') {
+    try {
+      const res = await env.DB.prepare('SELECT * FROM tasks WHERE status != "deleted" ORDER BY created_at DESC').all();
+      const tasks = (res.results || []).map((t: any) => ({
+        ...t,
+        is_active: t.status === 'active' || t.is_active === 1,
+        is_top_offer: Boolean(t.is_top_offer),
+        is_trending: Boolean(t.is_trending),
+        is_admin_created: true,
+        instructions: typeof t.instructions === 'string' ? JSON.parse(t.instructions) : (t.instructions || []),
       }));
       return json(tasks);
     } catch (e: any) {
@@ -617,6 +666,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     try {
       await env.DB.prepare('DELETE FROM notices WHERE id = ?').bind(noticeId).run();
       return json({ ok: true });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 22B. TOGGLE NOTICE ACTIVE (Admin)
+  if (pathname.startsWith('/api/admin/notices/') && pathname.endsWith('/toggle') && method === 'POST') {
+    const parts = pathname.split('/');
+    const noticeId = parts[parts.length - 2];
+    try {
+      const notice: any = await env.DB.prepare('SELECT is_active FROM notices WHERE id=?').bind(noticeId).first();
+      const newVal = notice?.is_active ? 0 : 1;
+      await env.DB.prepare('UPDATE notices SET is_active=? WHERE id=?').bind(newVal, noticeId).run();
+      return json({ ok: true, is_active: !!newVal });
     } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
   }
 

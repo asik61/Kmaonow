@@ -46,6 +46,17 @@ export default {
       });
     }
 
+    // App Version & Real-Time Auto-Update
+    if (pathname === '/api/version') {
+      const res = json({
+        version: '2.5.0',
+        buildId: 'kamaonow-build-' + Date.now(),
+        timestamp: Date.now(),
+      });
+      res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      return res;
+    }
+
     // 2. GET ACTIVE TASKS
     if (pathname === '/api/tasks' && method === 'GET') {
       try {

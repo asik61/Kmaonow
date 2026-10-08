@@ -28,6 +28,19 @@ async function startServer() {
     });
   });
 
+  // App Version & Real-Time Auto-Update Endpoint
+  app.get('/api/version', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.json({
+      version: '2.5.0',
+      buildId: 'kamaonow-build-' + (process.env.BUILD_ID || 'latest'),
+      serverTime: new Date().toISOString(),
+      timestamp: Date.now(),
+    });
+  });
+
   // Full Database Snapshot (For Backups / D1 Migration)
   app.get('/api/d1/snapshot', (_req, res) => {
     res.json(db.getSnapshot());
@@ -254,11 +267,48 @@ async function startServer() {
   });
 
   // =========================================================================
-  // VITE / STATIC SERVING
+  // VITE / STATIC SERVING & INSTANT REAL-TIME UPDATE HEADERS
   // =========================================================================
+  const setNoCacheHeaders = (res: express.Response) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  };
+
+  // Ensure sw.js and index.html never get cached by intermediate proxies or browsers
+  app.use((req, res, next) => {
+    if (
+      req.path === '/sw.js' ||
+      req.path === '/' ||
+      req.path === '/index.html' ||
+      req.path === '/manifest.json'
+    ) {
+      setNoCacheHeaders(res);
+    }
+    next();
+  });
+
   if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
+    app.use(
+      express.static(path.resolve(__dirname, 'dist'), {
+        etag: true,
+        lastModified: true,
+        setHeaders: (res, filePath) => {
+          if (
+            filePath.endsWith('sw.js') ||
+            filePath.endsWith('index.html') ||
+            filePath.endsWith('manifest.json')
+          ) {
+            setNoCacheHeaders(res);
+          } else if (filePath.includes('/assets/')) {
+            // Hashed Vite bundles are safe to cache because bundle hash changes on every build
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          }
+        },
+      })
+    );
     app.get('*', (_req, res) => {
+      setNoCacheHeaders(res);
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
   } else {

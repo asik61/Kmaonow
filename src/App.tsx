@@ -73,6 +73,8 @@ import { WithdrawModal } from './components/WithdrawModal';
 import { AdminPanel } from './components/AdminPanel';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { APP_VERSION } from './version';
+import { applyUpdate } from './utils/autoUpdater';
 import { HomeBannerSlider } from './components/HomeBannerSlider';
 import { EarningsCardImage } from './components/EarningsCardImage';
 import { AuthScreen } from './components/AuthScreen';
@@ -2557,6 +2559,25 @@ export default function App() {
                   </span>
                 </div>
                 <span className="text-[11px] text-rose-400 font-bold">Log Out</span>
+              </button>
+            </div>
+
+            {/* App Version & Instant Auto-Update Card */}
+            <div className="mt-3 p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-xs font-bold text-slate-800">App Version v{APP_VERSION}</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-0.5">Auto-Sync On • Reopen/Refresh pe auto update</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => applyUpdate()}
+                className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1 active:scale-95"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Check Update</span>
               </button>
             </div>
           </div>

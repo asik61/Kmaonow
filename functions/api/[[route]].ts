@@ -90,56 +90,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
-  // 1b. USER LOOKUP & SYNC
-  if (pathname.startsWith('/api/user/by-phone/') && method === 'GET') {
-    const rawPhone = pathname.split('/').pop() || '';
-    const cleanPhone = rawPhone.replace(/\D/g, '');
-    try {
-      const user = await env.DB.prepare(
-        'SELECT * FROM users WHERE replace(replace(phone, " ", ""), "+91", "") LIKE ?'
-      )
-        .bind(`%${cleanPhone}%`)
-        .first();
-      return json(user || { ok: false, error: 'User not found' });
-    } catch (e: any) {
-      return json({ error: e.message }, 500);
-    }
-  }
-
-  if (pathname === '/api/user/sync' && method === 'POST') {
-    try {
-      const u: any = await request.json();
-      const cleanPhone = (u.phone || '').replace(/\D/g, '');
-      const userId = u.id || `usr-${cleanPhone || Date.now()}`;
-      await env.DB.prepare(
-        `INSERT INTO users (id, name, phone, email, referral_code, referred_by, is_blocked, is_verified, role, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           name = excluded.name,
-           phone = excluded.phone,
-           email = excluded.email,
-           role = excluded.role,
-           is_verified = excluded.is_verified`
-      )
-        .bind(
-          userId,
-          u.name || 'User',
-          u.phone || '',
-          u.email || '',
-          u.referral_code || `RM${cleanPhone.slice(-4)}`,
-          u.referred_by || null,
-          u.is_blocked ? 1 : 0,
-          u.is_verified ? 1 : 0,
-          u.role || 'user',
-          u.created_at || new Date().toISOString()
-        )
-        .run();
-      return json({ ok: true, user: { ...u, id: userId } });
-    } catch (e: any) {
-      return json({ ok: false, error: e.message }, 500);
-    }
-  }
-
   // 2. GET ACTIVE TASKS
   if (pathname === '/api/tasks' && method === 'GET') {
     try {
@@ -158,7 +108,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // 3. GET WALLET FOR USER
   if (pathname.startsWith('/api/wallet/') && method === 'GET') {
-    const userId = pathname.split('/').pop() || 'usr-demo-001';
+    const userId = pathname.split('/').pop();
+    if (!userId) return json({ error: 'User ID is required' }, 400);
     try {
       let wallet = await env.DB.prepare('SELECT * FROM wallets WHERE user_id = ?')
         .bind(userId)
@@ -179,39 +130,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // 3b. SYNC WALLET FOR USER
-  if (pathname.startsWith('/api/wallet/') && pathname.endsWith('/sync') && method === 'POST') {
-    const parts = pathname.split('/');
-    const userId = parts[parts.length - 2] || 'usr-demo-001';
-    try {
-      const w: any = await request.json();
-      const avail = Number(w.available_balance ?? w.balance ?? 0);
-      const pend = Number(w.pending_balance ?? 0);
-      const earned = Number(w.lifetime_earned ?? 0);
-      const withdrawn = Number(w.lifetime_withdrawn ?? 0);
-
-      await env.DB.prepare(
-        `INSERT INTO wallets (id, user_id, available_balance, pending_balance, lifetime_earned, lifetime_withdrawn, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-         ON CONFLICT(user_id) DO UPDATE SET
-           available_balance = CASE WHEN excluded.available_balance = 0 AND wallets.available_balance > 0 THEN wallets.available_balance ELSE excluded.available_balance END,
-           pending_balance = MAX(wallets.pending_balance, excluded.pending_balance),
-           lifetime_earned = MAX(wallets.lifetime_earned, excluded.lifetime_earned, excluded.available_balance),
-           lifetime_withdrawn = MAX(wallets.lifetime_withdrawn, excluded.lifetime_withdrawn),
-           updated_at = CURRENT_TIMESTAMP`
-      )
-        .bind(`wal-${userId}`, userId, avail, pend, earned, withdrawn)
-        .run();
-
-      return json({ ok: true, wallet: { user_id: userId, available_balance: avail, pending_balance: pend, lifetime_earned: earned, lifetime_withdrawn: withdrawn } });
-    } catch (e: any) {
-      return json({ ok: false, error: e.message }, 500);
-    }
-  }
-
   // 4. GET LEDGER FOR USER
   if (pathname.startsWith('/api/ledger/') && method === 'GET') {
-    const userId = pathname.split('/').pop() || 'usr-demo-001';
+    const userId = pathname.split('/').pop();
+    if (!userId) return json({ error: 'User ID is required' }, 400);
     try {
       const res = await env.DB.prepare(
         'SELECT * FROM ledger WHERE user_id = ? ORDER BY created_at DESC LIMIT 50'
@@ -230,7 +152,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const parts = pathname.split('/');
       const taskId = parts[parts.length - 2];
       const body: any = await request.json();
-      const userId = body.userId || 'usr-demo-001';
+      const userId = body.userId;
+      if (!userId) return json({ ok: false, error: 'User ID is required' }, 400);
       let proofFileId = body.proofFileId;
 
       // Optional: Store Base64 screenshot into Cloudflare R2
@@ -277,26 +200,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // 5b. GET USER SUBMISSIONS
-  if (pathname.startsWith('/api/submissions/user/') && method === 'GET') {
-    const userId = pathname.split('/').pop() || 'usr-demo-001';
-    try {
-      const res = await env.DB.prepare(
-        'SELECT * FROM task_submissions WHERE user_id = ? ORDER BY submitted_at DESC'
-      )
-        .bind(userId)
-        .all();
-      return json(res.results || []);
-    } catch (e: any) {
-      return json({ error: e.message }, 500);
-    }
-  }
-
   // 6. RECORD SPIN REWARD (D1 server-side daily 3 limit check)
   if (pathname === '/api/spin' && method === 'POST') {
     try {
       const body: any = await request.json();
-      const userId = body.userId || 'usr-demo-001';
+      const userId = body.userId;
+      if (!userId) return json({ ok: false, error: 'User ID is required' }, 400);
       const amount = Number(body.amount);
       const DAILY_SPIN_LIMIT = 3;
 
@@ -343,7 +252,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (pathname === '/api/scratch' && method === 'POST') {
     try {
       const body: any = await request.json();
-      const userId = body.userId || 'usr-demo-001';
+      const userId = body.userId;
+      if (!userId) return json({ ok: false, error: 'User ID is required' }, 400);
       const amount = Number(body.amount);
       const DAILY_SCRATCH_LIMIT = 3;
 
@@ -390,7 +300,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (pathname === '/api/daily-bonus' && method === 'POST') {
     try {
       const body: any = await request.json();
-      const userId = body.userId || 'usr-demo-001';
+      const userId = body.userId;
+      if (!userId) return json({ ok: false, error: 'User ID is required' }, 400);
       const amount = 0.50;
       const today = new Date().toISOString().slice(0, 10);
 
@@ -581,6 +492,320 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     } catch (e: any) {
       return json({ ok: false, error: e.message }, 500);
     }
+  }
+
+  // 12. GET SUBMISSIONS FOR USER
+  if (pathname.startsWith('/api/submissions/') && method === 'GET') {
+    const userId = pathname.split('/').pop()!;
+    try {
+      const res = await env.DB.prepare(
+        'SELECT * FROM task_submissions WHERE user_id = ? ORDER BY submitted_at DESC'
+      ).bind(userId).all();
+      return json(res.results || []);
+    } catch (e: any) { return json({ error: e.message }, 500); }
+  }
+
+  // 13. GET ALL SUBMISSIONS (Admin)
+  if (pathname === '/api/admin/submissions' && method === 'GET') {
+    try {
+      const res = await env.DB.prepare(
+        'SELECT * FROM task_submissions ORDER BY submitted_at DESC LIMIT 200'
+      ).all();
+      return json(res.results || []);
+    } catch (e: any) { return json({ error: e.message }, 500); }
+  }
+
+  // 14. GET WITHDRAWALS FOR USER
+  if (pathname.startsWith('/api/withdrawals/') && method === 'GET') {
+    const userId = pathname.split('/').pop()!;
+    try {
+      const res = await env.DB.prepare(
+        'SELECT * FROM withdrawals WHERE user_id = ? ORDER BY requested_at DESC'
+      ).bind(userId).all();
+      return json(res.results || []);
+    } catch (e: any) { return json({ error: e.message }, 500); }
+  }
+
+  // 15. GET ALL WITHDRAWALS (Admin)
+  if (pathname === '/api/admin/withdrawals' && method === 'GET') {
+    try {
+      const res = await env.DB.prepare(
+        'SELECT * FROM withdrawals ORDER BY requested_at DESC LIMIT 200'
+      ).all();
+      return json(res.results || []);
+    } catch (e: any) { return json({ error: e.message }, 500); }
+  }
+
+  // 16. GET REFERRALS FOR USER
+  if (pathname.startsWith('/api/referrals/') && method === 'GET') {
+    const userId = pathname.split('/').pop()!;
+    try {
+      const res = await env.DB.prepare(
+        'SELECT * FROM referrals WHERE referrer_id = ? ORDER BY created_at DESC'
+      ).bind(userId).all();
+      return json(res.results || []);
+    } catch (e: any) { return json({ error: e.message }, 500); }
+  }
+
+  // 17. SPIN COUNT TODAY
+  if (pathname.startsWith('/api/spin-count/') && method === 'GET') {
+    const userId = pathname.split('/').pop()!;
+    const date = url.searchParams.get('date') || new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    try {
+      const row: any = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM spin_history WHERE user_id = ? AND date(created_at, '+5 hours 30 minutes') = ?"
+      ).bind(userId, date).first();
+      return json({ usedToday: row?.cnt ?? 0, remaining: Math.max(0, 3 - (row?.cnt ?? 0)) });
+    } catch (e: any) { return json({ usedToday: 0, remaining: 3 }); }
+  }
+
+  // 18. SCRATCH COUNT TODAY
+  if (pathname.startsWith('/api/scratch-count/') && method === 'GET') {
+    const userId = pathname.split('/').pop()!;
+    const date = url.searchParams.get('date') || new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    try {
+      const row: any = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM scratch_history WHERE user_id = ? AND date(created_at, '+5 hours 30 minutes') = ?"
+      ).bind(userId, date).first();
+      return json({ usedToday: row?.cnt ?? 0, remaining: Math.max(0, 3 - (row?.cnt ?? 0)) });
+    } catch (e: any) { return json({ usedToday: 0, remaining: 3 }); }
+  }
+
+  // 19. DAILY BONUS STATUS
+  if (pathname.startsWith('/api/daily-status/') && method === 'GET') {
+    const userId = pathname.split('/').pop()!;
+    const today = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    try {
+      const row = await env.DB.prepare(
+        'SELECT id FROM daily_bonus WHERE user_id = ? AND claim_date = ?'
+      ).bind(userId, today).first();
+      return json({ claimedToday: !!row });
+    } catch { return json({ claimedToday: false }); }
+  }
+
+  // 20. GET NOTICES (active only)
+  if (pathname === '/api/notices' && method === 'GET') {
+    try {
+      const res = await env.DB.prepare(
+        'SELECT * FROM notices WHERE is_active = 1 ORDER BY created_at DESC LIMIT 20'
+      ).all();
+      return json(res.results || []);
+    } catch (e: any) { return json([]); }
+  }
+
+  // 21. SAVE NOTICE (Admin)
+  if (pathname === '/api/admin/notices' && method === 'POST') {
+    try {
+      const body: any = await request.json();
+      if (body.id) {
+        await env.DB.prepare(
+          'UPDATE notices SET title=?, message=?, type=?, is_active=? WHERE id=?'
+        ).bind(body.title, body.message, body.type || 'success', body.is_active ? 1 : 0, body.id).run();
+      } else {
+        const id = `notice-${Date.now()}`;
+        await env.DB.prepare(
+          'INSERT INTO notices (id, title, message, type, is_active, author) VALUES (?, ?, ?, ?, 1, "Admin")'
+        ).bind(id, body.title, body.message, body.type || 'success').run();
+      }
+      return json({ ok: true });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 22. DELETE NOTICE (Admin)
+  if (pathname.startsWith('/api/admin/notices/') && method === 'DELETE') {
+    const noticeId = pathname.split('/').pop()!;
+    try {
+      await env.DB.prepare('DELETE FROM notices WHERE id = ?').bind(noticeId).run();
+      return json({ ok: true });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 23. SAVE TASK (Admin create/update)
+  if (pathname === '/api/admin/tasks' && method === 'POST') {
+    try {
+      const body: any = await request.json();
+      if (body.id) {
+        await env.DB.prepare(
+          `UPDATE tasks SET title=?, subtitle=?, description=?, category=?, reward_amount=?,
+           instructions=?, partner_url=?, icon_label=?, icon_bg=?, image_url=?,
+           is_active=?, is_top_offer=?, is_trending=? WHERE id=?`
+        ).bind(
+          body.title, body.subtitle, body.description, body.category,
+          body.reward_amount, JSON.stringify(body.instructions || []),
+          body.partner_url, body.icon_label, body.icon_bg, body.image_url || '',
+          body.is_active ? 1 : 0, body.is_top_offer ? 1 : 0, body.is_trending ? 1 : 0,
+          body.id
+        ).run();
+      } else {
+        const id = `task-admin-${Date.now()}`;
+        await env.DB.prepare(
+          `INSERT INTO tasks (id, title, subtitle, description, category, reward_amount,
+           instructions, partner_url, icon_label, icon_bg, image_url, is_active,
+           is_top_offer, is_trending, created_by, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'admin', 'active')`
+        ).bind(
+          id, body.title, body.subtitle, body.description, body.category,
+          body.reward_amount, JSON.stringify(body.instructions || []),
+          body.partner_url, body.icon_label || 'NEW', body.icon_bg || '#059669',
+          body.image_url || '', body.is_top_offer ? 1 : 0, body.is_trending ? 1 : 0
+        ).run();
+      }
+      return json({ ok: true });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 24. DELETE TASK (Admin)
+  if (pathname.startsWith('/api/admin/tasks/') && method === 'DELETE') {
+    const taskId = pathname.split('/').pop()!;
+    try {
+      await env.DB.prepare("UPDATE tasks SET status='deleted', is_active=0 WHERE id=?").bind(taskId).run();
+      return json({ ok: true });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 25. TOGGLE TASK ACTIVE (Admin)
+  if (pathname.startsWith('/api/admin/tasks/') && pathname.endsWith('/toggle') && method === 'POST') {
+    const taskId = pathname.split('/')[pathname.split('/').length - 2];
+    try {
+      const task: any = await env.DB.prepare('SELECT is_active FROM tasks WHERE id=?').bind(taskId).first();
+      const newVal = task?.is_active ? 0 : 1;
+      await env.DB.prepare('UPDATE tasks SET is_active=? WHERE id=?').bind(newVal, taskId).run();
+      return json({ ok: true, is_active: !!newVal });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 26. REJECT SUBMISSION (Admin)
+  if (pathname.startsWith('/api/admin/submissions/') && pathname.endsWith('/reject') && method === 'POST') {
+    try {
+      const parts = pathname.split('/');
+      const subId = parts[parts.length - 2];
+      const body: any = await request.json().catch(() => ({}));
+      const note = body.reason || 'Rejected by admin.';
+      const sub: any = await env.DB.prepare('SELECT * FROM task_submissions WHERE id=? AND status="pending"')
+        .bind(subId).first();
+      if (!sub) return json({ ok: false, error: 'Not found' }, 404);
+      await env.DB.prepare(
+        'UPDATE task_submissions SET status="rejected", admin_note=?, proof_file_id="", reviewed_at=CURRENT_TIMESTAMP WHERE id=?'
+      ).bind(note, subId).run();
+      await env.DB.prepare(
+        'UPDATE wallets SET pending_balance=MAX(0, pending_balance - ?), updated_at=CURRENT_TIMESTAMP WHERE user_id=?'
+      ).bind(sub.reward_amount, sub.user_id).run();
+      return json({ ok: true });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 27. REJECT WITHDRAWAL (Admin)
+  if (pathname.startsWith('/api/admin/withdrawals/') && pathname.endsWith('/reject') && method === 'POST') {
+    try {
+      const parts = pathname.split('/');
+      const wdrId = parts[parts.length - 2];
+      const body: any = await request.json().catch(() => ({}));
+      const reason = body.reason || 'Rejected by admin.';
+      const wdr: any = await env.DB.prepare('SELECT * FROM withdrawals WHERE id=? AND status="pending"')
+        .bind(wdrId).first();
+      if (!wdr) return json({ ok: false, error: 'Not found' }, 404);
+      await env.DB.prepare(
+        'UPDATE withdrawals SET status="rejected", rejection_reason=?, processed_at=CURRENT_TIMESTAMP WHERE id=?'
+      ).bind(reason, wdrId).run();
+      await env.DB.prepare(
+        'UPDATE wallets SET pending_balance=MAX(0, pending_balance - ?), available_balance=available_balance + ?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?'
+      ).bind(wdr.amount, wdr.amount, wdr.user_id).run();
+      return json({ ok: true });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 28. GET ALL USERS (Admin)
+  if (pathname === '/api/admin/users' && method === 'GET') {
+    try {
+      const res = await env.DB.prepare('SELECT * FROM users ORDER BY created_at DESC LIMIT 500').all();
+      return json(res.results || []);
+    } catch (e: any) { return json([], 500); }
+  }
+
+  // 29. BLOCK/UNBLOCK USER (Admin)
+  if (pathname.startsWith('/api/admin/users/') && pathname.endsWith('/toggle-block') && method === 'POST') {
+    const userId = pathname.split('/')[pathname.split('/').length - 2];
+    try {
+      const u: any = await env.DB.prepare('SELECT is_blocked FROM users WHERE id=?').bind(userId).first();
+      const newVal = u?.is_blocked ? 0 : 1;
+      await env.DB.prepare('UPDATE users SET is_blocked=? WHERE id=?').bind(newVal, userId).run();
+      return json({ ok: true, is_blocked: !!newVal });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 30. ADMIN ADJUST BALANCE
+  if (pathname.startsWith('/api/admin/users/') && pathname.endsWith('/adjust') && method === 'POST') {
+    const userId = pathname.split('/')[pathname.split('/').length - 2];
+    try {
+      const body: any = await request.json();
+      const amount = Number(body.amount);
+      const note = body.note || 'Admin adjustment';
+      await env.DB.prepare(
+        'UPDATE wallets SET available_balance=MAX(0, available_balance + ?), lifetime_earned=lifetime_earned + ?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?'
+      ).bind(amount, amount > 0 ? amount : 0, userId).run();
+      await env.DB.prepare(
+        'INSERT INTO ledger (id, user_id, type, amount, status, description) VALUES (?, ?, "admin_adjust", ?, ?, ?)'
+      ).bind(`led-${Date.now()}`, userId, Math.abs(amount), amount >= 0 ? 'credit' : 'debit', `Admin: ${note}`).run();
+      return json({ ok: true });
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 31. UPSERT USER (login ke baad user D1 mein save)
+  if (pathname === '/api/users/upsert' && method === 'POST') {
+    try {
+      const body: any = await request.json();
+      const existing = await env.DB.prepare('SELECT id FROM users WHERE id=?').bind(body.id).first();
+      if (!existing) {
+        await env.DB.prepare(
+          `INSERT INTO users (id, name, email, phone, photo_url, referral_code, referred_by, is_blocked)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
+        ).bind(
+          body.id, body.name, body.email || '', body.phone || '',
+          body.photo_url || '', body.referral_code || '',
+          body.referred_by || null
+        ).run();
+        // Wallet create karo
+        await env.DB.prepare(
+          'INSERT OR IGNORE INTO wallets (id, user_id, available_balance, pending_balance, lifetime_earned, lifetime_withdrawn) VALUES (?, ?, 0, 0, 0, 0)'
+        ).bind(`wal-${body.id}`, body.id).run();
+        // Referral record karo agar referred_by hai
+        if (body.referred_by) {
+          const referrer: any = await env.DB.prepare(
+            'SELECT id FROM users WHERE referral_code=? OR id=?'
+          ).bind(body.referred_by, body.referred_by).first();
+          if (referrer) {
+            await env.DB.prepare(
+              `INSERT OR IGNORE INTO referrals (id, referrer_id, referred_user_id, referred_name, status, reward_amount)
+               VALUES (?, ?, ?, ?, 'pending', 5.0)`
+            ).bind(`ref-${Date.now()}`, referrer.id, body.id, body.name).run();
+          }
+        }
+        return json({ ok: true, isNewUser: true });
+      } else {
+        await env.DB.prepare(
+          'UPDATE users SET name=?, email=?, photo_url=? WHERE id=?'
+        ).bind(body.name, body.email || '', body.photo_url || '', body.id).run();
+        return json({ ok: true, isNewUser: false });
+      }
+    } catch (e: any) { return json({ ok: false, error: e.message }, 500); }
+  }
+
+  // 32. D1 SNAPSHOT (Admin stats)
+  if (pathname === '/api/d1/snapshot' && method === 'GET') {
+    try {
+      const [users, wallets, subs, wdrs] = await env.DB.batch([
+        env.DB.prepare('SELECT COUNT(*) as cnt FROM users'),
+        env.DB.prepare('SELECT SUM(available_balance) as total FROM wallets'),
+        env.DB.prepare('SELECT COUNT(*) as cnt FROM task_submissions WHERE status="pending"'),
+        env.DB.prepare('SELECT COUNT(*) as cnt FROM withdrawals WHERE status="pending"'),
+      ]);
+      return json({
+        totalUsers: (users.results?.[0] as any)?.cnt ?? 0,
+        totalWalletBalance: (wallets.results?.[0] as any)?.total ?? 0,
+        pendingSubmissions: (subs.results?.[0] as any)?.cnt ?? 0,
+        pendingWithdrawals: (wdrs.results?.[0] as any)?.cnt ?? 0,
+      });
+    } catch (e: any) { return json({ error: e.message }, 500); }
   }
 
   return json({ error: 'Endpoint not found' }, 404);

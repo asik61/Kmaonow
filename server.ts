@@ -76,7 +76,8 @@ async function startServer() {
   app.post('/api/tasks/:id/submit', (req, res) => {
     try {
       const { userId, proofFileId } = req.body;
-      const sub = db.submitTaskProof(userId || 'usr-demo-001', req.params.id, proofFileId);
+      if (!userId) return res.status(400).json({ ok: false, error: 'User ID is required' });
+      const sub = db.submitTaskProof(userId, req.params.id, proofFileId);
       res.json({ ok: true, submission: sub });
     } catch (e: any) {
       res.status(400).json({ ok: false, error: e.message });
@@ -86,6 +87,12 @@ async function startServer() {
   app.get('/api/admin/submissions', (_req, res) => {
     const snapshot = db.getSnapshot();
     res.json(snapshot.task_submissions);
+  });
+
+  app.get('/api/submissions/:userId', (req, res) => {
+    const snapshot = db.getSnapshot();
+    const subs = snapshot.task_submissions.filter((s) => s.user_id === req.params.userId);
+    res.json(subs);
   });
 
   app.get('/api/submissions/user/:userId', (req, res) => {
@@ -130,21 +137,24 @@ async function startServer() {
   // 5. Spin History & Reward
   app.post('/api/spin', (req, res) => {
     const { userId, amount } = req.body;
-    const result = db.recordSpinReward(userId || 'usr-demo-001', Number(amount));
+    if (!userId) return res.status(400).json({ ok: false, error: 'User ID is required' });
+    const result = db.recordSpinReward(userId, Number(amount));
     res.json(result);
   });
 
   // 6. Scratch History & Reward
   app.post('/api/scratch', (req, res) => {
     const { userId, amount } = req.body;
-    const result = db.recordScratchReward(userId || 'usr-demo-001', Number(amount));
+    if (!userId) return res.status(400).json({ ok: false, error: 'User ID is required' });
+    const result = db.recordScratchReward(userId, Number(amount));
     res.json(result);
   });
 
   // 7. Daily Bonus
   app.post('/api/daily-bonus', (req, res) => {
     const { userId, amount } = req.body;
-    const result = db.claimDailyBonus(userId || 'usr-demo-001', amount ? Number(amount) : 0.50);
+    if (!userId) return res.status(400).json({ ok: false, error: 'User ID is required' });
+    const result = db.claimDailyBonus(userId, amount ? Number(amount) : 0.50);
     res.json(result);
   });
 
@@ -156,6 +166,12 @@ async function startServer() {
   });
 
   // 9. Withdrawals
+  app.get('/api/withdrawals/:userId', (req, res) => {
+    const snapshot = db.getSnapshot();
+    const wdrs = snapshot.withdrawals.filter((w) => w.user_id === req.params.userId);
+    res.json(wdrs);
+  });
+
   app.post('/api/withdraw', (req, res) => {
     const result = db.requestWithdrawal(req.body);
     if (!result.ok) return res.status(400).json(result);
@@ -196,6 +212,45 @@ async function startServer() {
       totalPayoutsDistributed: totalPayouts,
       totalActiveTasks: snapshot.tasks.filter((t) => t.status === 'active').length,
     });
+  });
+
+  // Spin & Scratch Daily Counts
+  app.get('/api/spin-count/:userId', (req, res) => {
+    const today = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const used = db.getSnapshot().spin_history.filter((s) => s.user_id === req.params.userId && (s.created_at || '').slice(0, 10) === today).length;
+    res.json({ usedToday: used, remaining: Math.max(0, 3 - used) });
+  });
+
+  app.get('/api/scratch-count/:userId', (req, res) => {
+    const today = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const used = db.getSnapshot().scratch_history.filter((s) => s.user_id === req.params.userId && (s.created_at || '').slice(0, 10) === today).length;
+    res.json({ usedToday: used, remaining: Math.max(0, 3 - used) });
+  });
+
+  app.get('/api/daily-status/:userId', (req, res) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const row = db.getSnapshot().daily_bonus.find((d) => d.user_id === req.params.userId && d.claim_date === today);
+    res.json({ claimedToday: !!row });
+  });
+
+  // Notices
+  app.get('/api/notices', (_req, res) => {
+    res.json((db.getSnapshot() as any).notices || []);
+  });
+
+  // Admin users list
+  app.get('/api/admin/users', (_req, res) => {
+    res.json(db.getSnapshot().users);
+  });
+
+  // User Upsert
+  app.post('/api/users/upsert', (req, res) => {
+    try {
+      const saved = db.saveUser(req.body);
+      res.json({ ok: true, user: saved });
+    } catch (e: any) {
+      res.status(400).json({ ok: false, error: e.message });
+    }
   });
 
   // =========================================================================

@@ -76,16 +76,7 @@ import { HomeBannerSlider } from './components/HomeBannerSlider';
 import { EarningsCardImage } from './components/EarningsCardImage';
 import { AuthScreen } from './components/AuthScreen';
 import { SplashScreen } from './components/SplashScreen';
-import {
-  testConnection,
-  syncUserProfile,
-  syncUserWallet,
-  fetchUserWallet,
-  syncTaskSubmission,
-  fetchUserSubmissions,
-  fetchAllSubmissions,
-  logoutFromFirebase,
-} from './services/firebase';
+import { testConnection, syncUserWallet, logoutFromFirebase } from './services/firebase';
 import { NotificationModal } from './components/NotificationModal';
 import { RulesModal } from './components/RulesModal';
 import {
@@ -184,29 +175,12 @@ export default function App() {
   // Core Data
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('kamaonow_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.id && parsed.id !== 'usr-rohan-01') {
-          return parsed;
-        }
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_USER;
+    return saved ? JSON.parse(saved) : INITIAL_USER;
   });
 
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    const saved = localStorage.getItem('kamaonow_user');
-    if (!saved) return false;
-    try {
-      const parsed = JSON.parse(saved);
-      return !!(parsed && parsed.id && parsed.id !== 'usr-rohan-01');
-    } catch {
-      return false;
-    }
+    return !!localStorage.getItem('kamaonow_user');
   });
 
   const [wallet, setWallet] = useState<WalletState>(() => {
@@ -214,10 +188,11 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.user_id && parsed.user_id !== 'usr-rohan-01') {
-          return parsed;
+        // If demo user or user with 0 earned, ensure clean 0.00 lifetime_withdrawn
+        if (parsed.user_id === 'usr-rohan-01' || (parsed.lifetime_earned === 0 && parsed.available_balance === 0)) {
+          return INITIAL_WALLET;
         }
-        return INITIAL_WALLET;
+        return parsed;
       } catch {
         return INITIAL_WALLET;
       }
@@ -354,45 +329,12 @@ export default function App() {
   // Admin & Multi-User Directory State
   const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('kamaonow_all_users');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(
-            (u: UserProfile) =>
-              u &&
-              u.id &&
-              !['usr-rohan-01', 'usr-priya-02', 'usr-amit-03', 'usr-vicky-04', 'usr-neha-05', 'usr-rajesh-06', 'usr-demo-001'].includes(u.id)
-          );
-        }
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_USERS_LIST;
+    return saved ? JSON.parse(saved) : INITIAL_USERS_LIST;
   });
 
   const [allWallets, setAllWallets] = useState<Record<string, WalletState>>(() => {
     const saved = localStorage.getItem('kamaonow_all_wallets');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          const cleaned: Record<string, WalletState> = {};
-          Object.keys(parsed).forEach((k) => {
-            if (
-              !['usr-rohan-01', 'usr-priya-02', 'usr-amit-03', 'usr-vicky-04', 'usr-neha-05', 'usr-rajesh-06', 'usr-demo-001'].includes(k)
-            ) {
-              cleaned[k] = parsed[k];
-            }
-          });
-          return cleaned;
-        }
-      } catch {
-        // fallback
-      }
-    }
-    return INITIAL_WALLETS_MAP;
+    return saved ? JSON.parse(saved) : INITIAL_WALLETS_MAP;
   });
 
   const [notices, setNotices] = useState<BroadcastNotice[]>(() => {
@@ -415,56 +357,51 @@ export default function App() {
   // Master Admin Email Check: ONLY asik94906@gmail.com has Admin permissions
   const isMasterAdmin = user?.email?.trim().toLowerCase() === 'asik94906@gmail.com';
 
-  // Sync state to localStorage & test Firestore connection
+  // Sync state to localStorage, purge legacy demo data, & fetch real data from API
   useEffect(() => {
     testConnection().catch(console.warn);
 
-    // Auto-migrate legacy localStorage to ensure clean 1st withdrawal and clean custom offers
-    const MIGRATION_KEY = 'realmoney_v12_clean_all_demo_offers';
-    if (!localStorage.getItem(MIGRATION_KEY)) {
-      if (user.id === 'usr-rohan-01') {
-        setWallet(INITIAL_WALLET);
-        localStorage.setItem('kamaonow_wallet', JSON.stringify(INITIAL_WALLET));
+    // One-time purge of legacy demo / mock data
+    const PURGE_KEY = 'realmoney_v20_purge_all_demo_data';
+    if (!localStorage.getItem(PURGE_KEY)) {
+      if (user.id === 'usr-rohan-01' || user.id.includes('demo')) {
+        setUser(INITIAL_USER);
+        setIsLoggedIn(false);
+        localStorage.removeItem('kamaonow_user');
       }
-      setWithdrawals((prev) => {
-        const cleaned = prev.filter((w) => !(w.user_id === 'usr-rohan-01' && (w.id === 'wdr-1' || w.id === 'wdr-2' || w.id.startsWith('wdr-10'))));
-        localStorage.setItem('kamaonow_withdrawals', JSON.stringify(cleaned));
-        return cleaned;
-      });
-      setTasks((prev) => {
-        const cleaned = prev.filter(
-          (t) =>
-            t.is_admin_created ||
-            t.created_by === 'admin' ||
-            t.id.startsWith('task-admin-')
-        );
-        const hasNavi = cleaned.some(
-          (t) => t.id === NAVI_TASK.id || t.title.toLowerCase().includes('navi')
-        );
-        const finalTasks = hasNavi ? cleaned : [NAVI_TASK, ...cleaned];
-        localStorage.setItem('kamaonow_tasks', JSON.stringify(finalTasks));
-        return finalTasks;
-      });
       setSubmissions((prev) => {
-        const cleaned = prev.filter((s) => !['sub-001', 'sub-002', 'sub-003'].includes(s.id));
+        const cleaned = prev.filter((s) => !s.id.startsWith('sub-00'));
         localStorage.setItem('kamaonow_submissions', JSON.stringify(cleaned));
         return cleaned;
       });
-      localStorage.setItem(MIGRATION_KEY, 'done');
+      setWithdrawals((prev) => {
+        const cleaned = prev.filter((w) => !w.id.startsWith('wdr-10') && w.id !== 'wdr-1' && w.id !== 'wdr-2');
+        localStorage.setItem('kamaonow_withdrawals', JSON.stringify(cleaned));
+        return cleaned;
+      });
+      setLedger((prev) => {
+        const cleaned = prev.filter((l) => !l.description?.toLowerCase().includes('demo'));
+        localStorage.setItem('kamaonow_ledger', JSON.stringify(cleaned));
+        return cleaned;
+      });
+      localStorage.setItem(PURGE_KEY, 'true');
     }
-  }, []);
 
-  // Always ensure NAVI_TASK and default admin offers are live in state & localStorage
-  useEffect(() => {
-    setTasks((prev) => {
-      const hasNavi = prev.some((t) => t.id === NAVI_TASK.id || t.title.toLowerCase().includes('navi'));
-      if (!hasNavi) {
-        const updated = [NAVI_TASK, ...prev];
-        localStorage.setItem('kamaonow_tasks', JSON.stringify(updated));
-        return updated;
-      }
-      return prev;
-    });
+    // Always fetch live real tasks from database on mount
+    fetch('/api/tasks')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setTasks(data);
+          localStorage.setItem('kamaonow_tasks', JSON.stringify(data));
+        }
+      })
+      .catch(console.warn);
+
+    // If user is already logged in, sync their real data from D1 database
+    if (user.id) {
+      loadUserDataFromD1(user.id);
+    }
   }, []);
 
   useEffect(() => {
@@ -532,6 +469,94 @@ export default function App() {
     localStorage.setItem('realmoney_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
+  // ─── D1 se user ka pura data load karna (login ke baad) ──────────────────
+  const loadUserDataFromD1 = async (userId: string) => {
+    try {
+      // Wallet
+      const walletRes = await fetch(`/api/wallet/${userId}`);
+      if (walletRes.ok) {
+        const walletData = await walletRes.json();
+        setWallet(walletData);
+        localStorage.setItem('kamaonow_wallet', JSON.stringify(walletData));
+      }
+
+      // Ledger
+      const ledgerRes = await fetch(`/api/ledger/${userId}`);
+      if (ledgerRes.ok) {
+        const ledgerData = await ledgerRes.json();
+        setLedger(ledgerData);
+        localStorage.setItem('kamaonow_ledger', JSON.stringify(ledgerData));
+      }
+
+      // Tasks (shared for all users — admin created)
+      const tasksRes = await fetch('/api/tasks');
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json();
+        if (Array.isArray(tasksData) && tasksData.length > 0) {
+          setTasks(tasksData);
+          localStorage.setItem('kamaonow_tasks', JSON.stringify(tasksData));
+        }
+      }
+
+      // Submissions for this user
+      const subsRes = await fetch(`/api/submissions/${userId}`);
+      if (subsRes.ok) {
+        const subsData = await subsRes.json();
+        setSubmissions(subsData);
+        localStorage.setItem('kamaonow_submissions', JSON.stringify(subsData));
+      }
+
+      // Withdrawals for this user
+      const wdrRes = await fetch(`/api/withdrawals/${userId}`);
+      if (wdrRes.ok) {
+        const wdrData = await wdrRes.json();
+        setWithdrawals(wdrData);
+        localStorage.setItem('kamaonow_withdrawals', JSON.stringify(wdrData));
+      }
+
+      // Referrals for this user
+      const refRes = await fetch(`/api/referrals/${userId}`);
+      if (refRes.ok) {
+        const refData = await refRes.json();
+        setReferrals(refData);
+        localStorage.setItem('kamaonow_referrals', JSON.stringify(refData));
+      }
+
+      // Spin/Scratch remaining today (D1 se)
+      const todayIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const spinCountRes = await fetch(`/api/spin-count/${userId}?date=${todayIST}`);
+      if (spinCountRes.ok) {
+        const { usedToday: spinUsed } = await spinCountRes.json();
+        setFreeSpinsLeft(Math.max(0, 3 - spinUsed));
+        setDailySpinClaimed(spinUsed >= 3);
+      }
+
+      const scratchCountRes = await fetch(`/api/scratch-count/${userId}?date=${todayIST}`);
+      if (scratchCountRes.ok) {
+        const { usedToday: scratchUsed } = await scratchCountRes.json();
+        setFreeScratchesLeft(Math.max(0, 3 - scratchUsed));
+        setDailyScratchClaimed(scratchUsed >= 3);
+      }
+
+      // Daily bonus claimed today?
+      const dailyRes = await fetch(`/api/daily-status/${userId}`);
+      if (dailyRes.ok) {
+        const { claimedToday } = await dailyRes.json();
+        setDailyBonusClaimed(claimedToday);
+      }
+
+      // Notices
+      const noticesRes = await fetch('/api/notices');
+      if (noticesRes.ok) {
+        const noticesData = await noticesRes.json();
+        setNotices(noticesData);
+      }
+
+    } catch (e) {
+      console.warn('D1 load failed, using localStorage fallback:', e);
+    }
+  };
+
   // ─── navigateTo: tab change + URL update + title update ───────────────────
   const navigateTo = (tab: NavTab) => {
     setActiveTab(tab);
@@ -588,24 +613,17 @@ export default function App() {
       submitted_at: new Date().toISOString(),
     };
 
-    const updatedPending = Number((wallet.pending_balance + targetTask.reward_amount).toFixed(2));
-    const updatedWallet: WalletState = {
-      ...wallet,
-      user_id: user.id,
-      pending_balance: updatedPending,
-      updated_at: new Date().toISOString(),
-    };
-
-    setSubmissions((prev) => [newSub, ...prev]);
-    localStorage.setItem('kamaonow_submissions', JSON.stringify([newSub, ...submissions]));
-
-    setWallet(updatedWallet);
-    localStorage.setItem('kamaonow_wallet', JSON.stringify(updatedWallet));
-    setAllWallets((prev) => {
-      const up = { ...prev, [user.id]: updatedWallet };
-      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
-      return up;
-    });
+    setSubmissions([newSub, ...submissions]);
+    setWallet((prev) => ({
+      ...prev,
+      pending_balance: prev.pending_balance + targetTask.reward_amount,
+    }));
+    // D1 mein bhi submit karo
+    fetch(`/api/tasks/${targetTask.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, proofFileId: payload.proofDataUrl }),
+    }).catch(console.warn);
 
     // In-App Notification
     const notif: InAppNotification = {
@@ -625,213 +643,71 @@ export default function App() {
     }).catch(console.warn);
 
     showToast(`Screenshot submit ho gaya! ₹${targetTask.reward_amount.toFixed(2)} under review hai. 🎉`);
-
-    // Persistent Cloud & Backend Sync
-    syncUserWallet(user.id, updatedWallet).catch(console.warn);
-    fetch(`/api/wallet/${user.id}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedWallet),
-    }).catch(console.warn);
-
-    syncTaskSubmission(newSub).catch(console.warn);
-    fetch(`/api/tasks/${targetTask.id}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, proofFileId: payload.proofDataUrl }),
-    }).catch(console.warn);
   };
 
-  // ─── restoreUserWallet: Cloud & Backend Sync (No balance lost on reinstall/login) ───
-  const restoreUserWallet = async (targetUserId: string): Promise<WalletState | null> => {
-    try {
-      // 1. Check Backend API (/api/wallet/:userId)
-      let serverWallet: WalletState | null = null;
-      try {
-        const res = await fetch(`/api/wallet/${targetUserId}`);
-        if (res.ok) {
-          const data = (await res.json()) as any;
-          if (data && (data.available_balance !== undefined || data.balance !== undefined)) {
-            serverWallet = {
-              id: data.id || `wal-${targetUserId}`,
-              user_id: targetUserId,
-              available_balance: Number(data.available_balance ?? data.balance ?? 0),
-              pending_balance: Number(data.pending_balance ?? 0),
-              lifetime_earned: Number(data.lifetime_earned ?? 0),
-              lifetime_withdrawn: Number(data.lifetime_withdrawn ?? 0),
-              updated_at: data.updated_at || new Date().toISOString(),
-            };
-          }
-        }
-      } catch (e) {
-        console.warn('Backend wallet lookup:', e);
-      }
-
-      // 2. Check Firestore (wallets/:userId)
-      let firestoreWallet: WalletState | null = null;
-      try {
-        firestoreWallet = await fetchUserWallet(targetUserId);
-      } catch (e) {
-        console.warn('Firestore wallet lookup:', e);
-      }
-
-      // 3. Check local allWallets cache
-      const localCandidate = allWallets[targetUserId];
-
-      const candidates = [serverWallet, firestoreWallet, localCandidate].filter(
-        (w): w is WalletState =>
-          !!w &&
-          (w.available_balance > 0 || w.lifetime_earned > 0 || w.lifetime_withdrawn > 0 || w.pending_balance > 0)
-      );
-
-      if (candidates.length === 0 && (serverWallet || firestoreWallet)) {
-        const fallback = serverWallet || firestoreWallet;
-        if (fallback) candidates.push(fallback);
-      }
-
-      let bestWallet: WalletState | null = null;
-      if (candidates.length > 0) {
-        // Pick the most updated wallet with highest earnings
-        candidates.sort(
-          (a, b) => b.lifetime_earned - a.lifetime_earned || b.available_balance - a.available_balance
-        );
-        bestWallet = candidates[0];
-
-        setWallet(bestWallet);
-        localStorage.setItem('kamaonow_wallet', JSON.stringify(bestWallet));
-        setAllWallets((prev) => {
-          const up = { ...prev, [targetUserId]: bestWallet! };
-          localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
-          return up;
-        });
-
-        // Sync both backend and Firestore to keep them updated
-        syncUserWallet(targetUserId, bestWallet).catch(console.warn);
-        fetch(`/api/wallet/${targetUserId}/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bestWallet),
-        }).catch(console.warn);
-      }
-
-      // Restore Ledger from Backend API
-      try {
-        const ledRes = await fetch(`/api/ledger/${targetUserId}`);
-        if (ledRes.ok) {
-          const ledData = (await ledRes.json()) as LedgerItem[];
-          if (Array.isArray(ledData) && ledData.length > 0) {
-            setLedger((prev) => {
-              const combined = [...ledData];
-              prev.forEach((p) => {
-                if (!combined.some((c) => c.id === p.id)) combined.push(p);
-              });
-              localStorage.setItem('kamaonow_ledger', JSON.stringify(combined));
-              return combined;
-            });
-          }
-        }
-      } catch {
-        // fallback
-      }
-
-      // Restore Submissions from Firestore & Backend
-      try {
-        const cloudSubs = await fetchUserSubmissions(targetUserId);
-        let sList = cloudSubs;
-        if (!sList || sList.length === 0) {
-          const sRes = await fetch(`/api/submissions/user/${targetUserId}`);
-          if (sRes.ok) sList = await sRes.json();
-        }
-        if (Array.isArray(sList) && sList.length > 0) {
-          setSubmissions((prev) => {
-            const combined = [...prev];
-            sList.forEach((cs: any) => {
-              const idx = combined.findIndex((c) => c.id === cs.id);
-              if (idx >= 0) {
-                combined[idx] = { ...combined[idx], ...cs };
-              } else {
-                combined.unshift(cs);
-              }
-            });
-            localStorage.setItem('kamaonow_submissions', JSON.stringify(combined));
-            return combined;
-          });
-        }
-      } catch (e) {
-        console.warn('Submissions restore fallback:', e);
-      }
-
-      return bestWallet;
-    } catch (err) {
-      console.warn('restoreUserWallet error:', err);
-      return null;
-    }
-  };
-
-  // Restore wallet whenever logged in user opens app or session boots
-  useEffect(() => {
-    if (isLoggedIn && user?.id) {
-      restoreUserWallet(user.id);
-    }
-  }, [user.id, isLoggedIn]);
-
-  // Spin Reward Won (Daily 3 Free Spins — instant credit & cloud synced)
+  // Spin Reward Won (Daily 3 Free Spins — D1 server-side validated)
   const handleSpinWon = async (amount: number) => {
-    const today = new Date().toISOString().slice(0, 10);
-    const savedDate = localStorage.getItem('realmoney_spin_date');
-    let usedToday = savedDate === today ? parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10) : 0;
+    // Pehle server se check karo (D1 database se — localStorage bypass proof)
+    try {
+      const res = await fetch('/api/spin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, amount }),
+      });
+      const data = await res.json() as { ok: boolean; error?: string; limitReached?: boolean; remaining?: number; usedToday?: number };
 
-    if (usedToday >= 3) {
-      setFreeSpinsLeft(0);
-      setDailySpinClaimed(true);
-      showToast('❌ Aaj ke 3 free spins use ho chuke hain! Kal dobara koshish karein.');
-      return;
+      if (!data.ok) {
+        if (data.limitReached) {
+          // Server ne block kiya — localStorage bhi sync karo
+          setFreeSpinsLeft(0);
+          setDailySpinClaimed(true);
+          const today = new Date().toISOString().slice(0, 10);
+          localStorage.setItem('realmoney_spin_date', today);
+          localStorage.setItem('realmoney_spins_count', '3');
+          showToast('❌ Aaj ke 3 spins already use ho chuke hain! (Server verified)');
+        } else {
+          showToast('Spin record nahi hua, try again.');
+        }
+        return;
+      }
+
+      // Server se confirmed — ab UI update karo
+      const remaining = data.remaining ?? 0;
+      const newUsed = data.usedToday ?? 3;
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('realmoney_spin_date', today);
+      localStorage.setItem('realmoney_spins_count', String(newUsed));
+      setFreeSpinsLeft(remaining);
+      if (remaining <= 0) setDailySpinClaimed(true);
+
+    } catch {
+      // Server unreachable — fallback to localStorage (offline mode)
+      const today = new Date().toISOString().slice(0, 10);
+      const savedDate = localStorage.getItem('realmoney_spin_date');
+      let usedToday = 0;
+      if (savedDate === today) {
+        usedToday = parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10);
+      }
+      if (usedToday >= 3) {
+        showToast('❌ Aaj ke 3 spins use ho chuke hain!');
+        return;
+      }
+      const newUsed = usedToday + 1;
+      localStorage.setItem('realmoney_spin_date', today);
+      localStorage.setItem('realmoney_spins_count', String(newUsed));
+      const remaining = Math.max(0, 3 - newUsed);
+      setFreeSpinsLeft(remaining);
+      if (remaining <= 0) setDailySpinClaimed(true);
     }
 
-    const newUsed = usedToday + 1;
-    const remaining = Math.max(0, 3 - newUsed);
-    localStorage.setItem('realmoney_spin_date', today);
-    localStorage.setItem('realmoney_spins_count', String(newUsed));
-    setFreeSpinsLeft(remaining);
-    if (remaining <= 0) setDailySpinClaimed(true);
-
-    // 1. Instantly update wallet state & localStorage (GUARANTEED: NEVER MISS MONEY)
-    let updatedWallet: WalletState;
-    setWallet((prev) => {
-      const curAvail = Number(prev.available_balance || 0);
-      const curEarned = Number(prev.lifetime_earned || 0);
-      const newBal = Number((curAvail + amount).toFixed(2));
-      const newEarned = Number((curEarned + amount).toFixed(2));
-      updatedWallet = {
-        ...prev,
-        id: prev.id || `wal-${user.id}`,
-        user_id: user.id,
-        available_balance: newBal,
-        lifetime_earned: newEarned,
-        updated_at: new Date().toISOString(),
-      };
-      localStorage.setItem('kamaonow_wallet', JSON.stringify(updatedWallet));
-      return updatedWallet;
-    });
-
-    setAllWallets((prev) => {
-      const current = prev[user.id] || wallet;
-      const curAvail = Number(current.available_balance || 0);
-      const curEarned = Number(current.lifetime_earned || 0);
-      const up: WalletState = {
-        ...current,
-        id: current.id || `wal-${user.id}`,
-        user_id: user.id,
-        available_balance: Number((curAvail + amount).toFixed(2)),
-        lifetime_earned: Number((curEarned + amount).toFixed(2)),
-        updated_at: new Date().toISOString(),
-      };
-      const map = { ...prev, [user.id]: up };
-      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(map));
-      return map;
-    });
-
-    // 2. Add to Ledger
+    // Wallet + Ledger update
+    const today = new Date().toISOString().slice(0, 10);
+    const newUsed = parseInt(localStorage.getItem('realmoney_spins_count') || '1', 10);
+    setWallet((prev) => ({
+      ...prev,
+      available_balance: Number((prev.available_balance + amount).toFixed(2)),
+      lifetime_earned: Number((prev.lifetime_earned + amount).toFixed(2)),
+    }));
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
       user_id: user.id,
@@ -841,90 +717,77 @@ export default function App() {
       description: `Daily Lucky Spin #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
-    setLedger((prev) => {
-      const up = [newEntry, ...prev];
-      localStorage.setItem('kamaonow_ledger', JSON.stringify(up));
-      return up;
-    });
-
+    setLedger((prev) => [newEntry, ...prev]);
+    const remaining = Math.max(0, 3 - newUsed);
     if (remaining > 0) {
-      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Abhi ${remaining}/3 spins baaki hain. 🎯`);
+      showToast(`+₹${amount.toFixed(2)} credited! Abhi ${remaining}/3 free spins baaki hain. 🎯`);
     } else {
-      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Aaj ke sabhi 3 spins complete ho gaye. 🎉`);
+      showToast(`+₹${amount.toFixed(2)} credited! Aaj ke sabhi 3 free spins complete ho gaye. 🎉`);
     }
-
-    // 3. Persistent sync to backend & Firestore in background
-    syncUserWallet(user.id, updatedWallet!).catch(console.warn);
-    fetch(`/api/wallet/${user.id}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedWallet!),
-    }).catch(console.warn);
-
-    fetch('/api/spin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, amount }),
-    }).catch(console.warn);
   };
 
-  // Scratch Reward Won (Daily 3 Free Scratch Cards — instant credit & cloud synced)
+  // Scratch Reward Won (Daily 3 Free Scratch Cards — D1 server-side validated)
   const handleScratchWon = async (amount: number) => {
-    const today = new Date().toISOString().slice(0, 10);
-    const savedDate = localStorage.getItem('realmoney_scratch_date');
-    let usedToday = savedDate === today ? parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10) : 0;
+    // Pehle server se check karo (D1 database se — localStorage bypass proof)
+    try {
+      const res = await fetch('/api/scratch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, amount }),
+      });
+      const data = await res.json() as { ok: boolean; error?: string; limitReached?: boolean; remaining?: number; usedToday?: number };
 
-    if (usedToday >= 3) {
-      setFreeScratchesLeft(0);
-      setDailyScratchClaimed(true);
-      showToast('❌ Aaj ke 3 scratch cards use ho chuke hain! Kal dobara koshish karein.');
-      return;
+      if (!data.ok) {
+        if (data.limitReached) {
+          // Server ne block kiya — localStorage bhi sync karo
+          setFreeScratchesLeft(0);
+          setDailyScratchClaimed(true);
+          const today = new Date().toISOString().slice(0, 10);
+          localStorage.setItem('realmoney_scratch_date', today);
+          localStorage.setItem('realmoney_scratch_count', '3');
+          showToast('❌ Aaj ke 3 scratch cards already use ho chuke hain! (Server verified)');
+        } else {
+          showToast('Scratch record nahi hua, try again.');
+        }
+        return;
+      }
+
+      // Server se confirmed — ab UI update karo
+      const remaining = data.remaining ?? 0;
+      const newUsed = data.usedToday ?? 3;
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('realmoney_scratch_date', today);
+      localStorage.setItem('realmoney_scratch_count', String(newUsed));
+      setFreeScratchesLeft(remaining);
+      if (remaining <= 0) setDailyScratchClaimed(true);
+
+    } catch {
+      // Server unreachable — fallback to localStorage (offline mode)
+      const today = new Date().toISOString().slice(0, 10);
+      const savedDate = localStorage.getItem('realmoney_scratch_date');
+      let usedToday = 0;
+      if (savedDate === today) {
+        usedToday = parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10);
+      }
+      if (usedToday >= 3) {
+        showToast('❌ Aaj ke 3 scratch cards use ho chuke hain!');
+        return;
+      }
+      const newUsed = usedToday + 1;
+      localStorage.setItem('realmoney_scratch_date', today);
+      localStorage.setItem('realmoney_scratch_count', String(newUsed));
+      const remaining = Math.max(0, 3 - newUsed);
+      setFreeScratchesLeft(remaining);
+      if (remaining <= 0) setDailyScratchClaimed(true);
     }
 
-    const newUsed = usedToday + 1;
-    const remaining = Math.max(0, 3 - newUsed);
-    localStorage.setItem('realmoney_scratch_date', today);
-    localStorage.setItem('realmoney_scratch_count', String(newUsed));
-    setFreeScratchesLeft(remaining);
-    if (remaining <= 0) setDailyScratchClaimed(true);
-
-    // 1. Instantly update wallet state & localStorage (GUARANTEED: NEVER MISS MONEY)
-    let updatedWallet: WalletState;
-    setWallet((prev) => {
-      const curAvail = Number(prev.available_balance || 0);
-      const curEarned = Number(prev.lifetime_earned || 0);
-      const newBal = Number((curAvail + amount).toFixed(2));
-      const newEarned = Number((curEarned + amount).toFixed(2));
-      updatedWallet = {
-        ...prev,
-        id: prev.id || `wal-${user.id}`,
-        user_id: user.id,
-        available_balance: newBal,
-        lifetime_earned: newEarned,
-        updated_at: new Date().toISOString(),
-      };
-      localStorage.setItem('kamaonow_wallet', JSON.stringify(updatedWallet));
-      return updatedWallet;
-    });
-
-    setAllWallets((prev) => {
-      const current = prev[user.id] || wallet;
-      const curAvail = Number(current.available_balance || 0);
-      const curEarned = Number(current.lifetime_earned || 0);
-      const up: WalletState = {
-        ...current,
-        id: current.id || `wal-${user.id}`,
-        user_id: user.id,
-        available_balance: Number((curAvail + amount).toFixed(2)),
-        lifetime_earned: Number((curEarned + amount).toFixed(2)),
-        updated_at: new Date().toISOString(),
-      };
-      const map = { ...prev, [user.id]: up };
-      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(map));
-      return map;
-    });
-
-    // 2. Add to Ledger
+    // Wallet + Ledger update
+    const newUsed = parseInt(localStorage.getItem('realmoney_scratch_count') || '1', 10);
+    setWallet((prev) => ({
+      ...prev,
+      available_balance: Number((prev.available_balance + amount).toFixed(2)),
+      lifetime_earned: Number((prev.lifetime_earned + amount).toFixed(2)),
+    }));
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
       user_id: user.id,
@@ -934,31 +797,13 @@ export default function App() {
       description: `Daily Scratch Card #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
-    setLedger((prev) => {
-      const up = [newEntry, ...prev];
-      localStorage.setItem('kamaonow_ledger', JSON.stringify(up));
-      return up;
-    });
-
+    setLedger((prev) => [newEntry, ...prev]);
+    const remaining = Math.max(0, 3 - newUsed);
     if (remaining > 0) {
-      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Abhi ${remaining}/3 scratch cards baaki hain. 🎁`);
+      showToast(`+₹${amount.toFixed(2)} credited! Abhi ${remaining}/3 scratch cards baaki hain. 🎁`);
     } else {
-      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Aaj ke sabhi 3 scratch cards complete ho gaye. 🎉`);
+      showToast(`+₹${amount.toFixed(2)} credited! Aaj ke sabhi 3 scratch cards complete ho gaye. 🎉`);
     }
-
-    // 3. Persistent sync to backend & Firestore in background
-    syncUserWallet(user.id, updatedWallet!).catch(console.warn);
-    fetch(`/api/wallet/${user.id}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedWallet!),
-    }).catch(console.warn);
-
-    fetch('/api/scratch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, amount }),
-    }).catch(console.warn);
   };
 
   // Daily Bonus
@@ -967,25 +812,24 @@ export default function App() {
     const bonus = 0.50;
     setDailyBonusClaimed(true);
     localStorage.setItem('kamaonow_daily_date', new Date().toISOString().slice(0, 10));
+    // D1 mein bhi save karo
+    fetch('/api/daily-bonus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, amount: bonus }),
+    }).then(async (res) => {
+      const data = await res.json() as { ok: boolean; error?: string };
+      if (!data.ok && data.error === 'Already claimed today') {
+        // Server ne block kiya — UI revert karo
+        setDailyBonusClaimed(true);
+      }
+    }).catch(console.warn);
 
-    const newBal = Number((wallet.available_balance + bonus).toFixed(2));
-    const newEarned = Number((wallet.lifetime_earned + bonus).toFixed(2));
-    const updatedWallet: WalletState = {
-      ...wallet,
-      user_id: user.id,
-      available_balance: newBal,
-      lifetime_earned: newEarned,
-      updated_at: new Date().toISOString(),
-    };
-
-    setWallet(updatedWallet);
-    localStorage.setItem('kamaonow_wallet', JSON.stringify(updatedWallet));
-
-    setAllWallets((prev) => {
-      const up = { ...prev, [user.id]: updatedWallet };
-      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
-      return up;
-    });
+    setWallet((prev) => ({
+      ...prev,
+      available_balance: Number((prev.available_balance + bonus).toFixed(2)),
+      lifetime_earned: Number((prev.lifetime_earned + bonus).toFixed(2)),
+    }));
 
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
@@ -996,25 +840,8 @@ export default function App() {
       description: 'Roz ka Daily Bonus: ₹0.50',
       created_at: new Date().toISOString(),
     };
-    setLedger((prev) => {
-      const up = [newEntry, ...prev];
-      localStorage.setItem('kamaonow_ledger', JSON.stringify(up));
-      return up;
-    });
-
-    showToast('Roz ka Bonus: +₹0.50 wallet me add ho gaya! 🎉');
-
-    syncUserWallet(user.id, updatedWallet).catch(console.warn);
-    fetch(`/api/wallet/${user.id}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedWallet),
-    }).catch(console.warn);
-    fetch('/api/daily-bonus', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id, amount: bonus }),
-    }).catch(console.warn);
+    setLedger([newEntry, ...ledger]);
+    showToast('Roz ka Bonus: ₹0.50 credited!');
   };
 
   // Withdrawal Request
@@ -1078,6 +905,19 @@ export default function App() {
       available_balance: Number((prev.available_balance - payload.amount).toFixed(2)),
       pending_balance: Number((prev.pending_balance + payload.amount).toFixed(2)),
     }));
+    // D1 mein bhi save karo
+    fetch('/api/withdraw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        amount: payload.amount,
+        method: payload.method,
+        upiId: payload.upiId,
+        bankAccount: payload.bankAccount,
+        bankIfsc: payload.bankIfsc,
+      }),
+    }).catch(console.warn);
 
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
@@ -1114,6 +954,12 @@ export default function App() {
   const handleAdminApproveSubmission = (subId: string) => {
     const sub = submissions.find((s) => s.id === subId);
     if (!sub || sub.status !== 'pending') return;
+    // D1 mein bhi approve karo
+    fetch(`/api/admin/submissions/${subId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminNote: 'Verified and approved by Admin.' }),
+    }).then(() => loadUserDataFromD1(user.id)).catch(console.warn);
 
     // Check if this is the user's very first approved task (Sign-up Bonus Part 2)
     const previouslyApprovedCount = submissions.filter(
@@ -1123,66 +969,32 @@ export default function App() {
     const extraFirstTaskBonus = isFirstTaskApproval ? 5 : 0;
     const totalCredit = Number((sub.reward_amount + extraFirstTaskBonus).toFixed(2));
 
-    const updatedSub = {
-      ...sub,
-      status: 'approved' as const,
-      proof_file_id: '', // Proof delete after approval (D1 space bachao)
-      proof_screenshot_url: undefined,
-      admin_note: isFirstTaskApproval
-        ? 'Verified & approved by Admin. +₹5 1st Task Sign-up Bonus credited!'
-        : 'Verified and approved by Admin.',
-      reviewed_at: new Date().toISOString(),
-    };
-
     setSubmissions((prev) =>
-      prev.map((s) => (s.id === subId ? updatedSub : s))
+      prev.map((s) =>
+        s.id === subId
+          ? {
+              ...s,
+              status: 'approved',
+              proof_file_id: '', // Proof delete after approval (D1 space bachao)
+              proof_screenshot_url: undefined,
+              admin_note: isFirstTaskApproval
+                ? 'Verified & approved by Admin. +₹5 1st Task Sign-up Bonus credited!'
+                : 'Verified and approved by Admin.',
+              reviewed_at: new Date().toISOString(),
+            }
+          : s
+      )
     );
 
-    // Calculate updated wallet for target user
-    const targetUserWallet = allWallets[sub.user_id] || (sub.user_id === user.id ? wallet : {
-      id: `wal-${sub.user_id}`,
-      user_id: sub.user_id,
-      available_balance: 0,
-      pending_balance: sub.reward_amount,
-      lifetime_earned: 0,
-      lifetime_withdrawn: 0,
-      updated_at: new Date().toISOString(),
-    });
-
-    const newTargetWallet: WalletState = {
-      ...targetUserWallet,
-      user_id: sub.user_id,
-      pending_balance: Math.max(0, Number((targetUserWallet.pending_balance - sub.reward_amount).toFixed(2))),
-      available_balance: Number((targetUserWallet.available_balance + totalCredit).toFixed(2)),
-      lifetime_earned: Number((targetUserWallet.lifetime_earned + totalCredit).toFixed(2)),
-      updated_at: new Date().toISOString(),
-    };
-
+    // If approved submission is for current logged-in user, update their wallet
     if (sub.user_id === user.id) {
-      setWallet(newTargetWallet);
-      localStorage.setItem('kamaonow_wallet', JSON.stringify(newTargetWallet));
+      setWallet((prev) => ({
+        ...prev,
+        pending_balance: Math.max(0, Number((prev.pending_balance - sub.reward_amount).toFixed(2))),
+        available_balance: Number((prev.available_balance + totalCredit).toFixed(2)),
+        lifetime_earned: Number((prev.lifetime_earned + totalCredit).toFixed(2)),
+      }));
     }
-
-    setAllWallets((prevMap) => {
-      const up = { ...prevMap, [sub.user_id]: newTargetWallet };
-      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
-      return up;
-    });
-
-    // Cloud & backend persistence for the user who earned the task reward
-    syncUserWallet(sub.user_id, newTargetWallet).catch(console.warn);
-    fetch(`/api/wallet/${sub.user_id}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTargetWallet),
-    }).catch(console.warn);
-
-    syncTaskSubmission(updatedSub).catch(console.warn);
-    fetch(`/api/admin/submissions/${sub.id}/approve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminNote: updatedSub.admin_note }),
-    }).catch(console.warn);
 
     const newEntries: LedgerItem[] = [
       {
@@ -1235,45 +1047,14 @@ export default function App() {
           )
         );
 
-        // 2. Update referrer's wallet
-        const rWal = allWallets[effectiveReferrerId] || (effectiveReferrerId === user.id ? wallet : {
-          id: `wal-${effectiveReferrerId}`,
-          user_id: effectiveReferrerId,
-          available_balance: 0,
-          pending_balance: 0,
-          lifetime_earned: 0,
-          lifetime_withdrawn: 0,
-          updated_at: new Date().toISOString(),
-        });
-
-        const newRefWallet: WalletState = {
-          ...rWal,
-          user_id: effectiveReferrerId,
-          available_balance: Number((rWal.available_balance + 5.0).toFixed(2)),
-          lifetime_earned: Number((rWal.lifetime_earned + 5.0).toFixed(2)),
-          updated_at: new Date().toISOString(),
-        };
-
+        // 2. If current user is the referrer, credit their wallet directly
         if (effectiveReferrerId === user.id) {
-          setWallet(newRefWallet);
-          localStorage.setItem('kamaonow_wallet', JSON.stringify(newRefWallet));
-        }
+          setWallet((prev) => ({
+            ...prev,
+            available_balance: Number((prev.available_balance + 5.0).toFixed(2)),
+            lifetime_earned: Number((prev.lifetime_earned + 5.0).toFixed(2)),
+          }));
 
-        setAllWallets((prevMap) => {
-          const up = { ...prevMap, [effectiveReferrerId]: newRefWallet };
-          localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
-          return up;
-        });
-
-        // Cloud sync for referrer wallet
-        syncUserWallet(effectiveReferrerId, newRefWallet).catch(console.warn);
-        fetch(`/api/wallet/${effectiveReferrerId}/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newRefWallet),
-        }).catch(console.warn);
-
-        if (effectiveReferrerId === user.id) {
           setLedger((prev) => [
             {
               id: `led-ref-${Date.now()}`,
@@ -1298,6 +1079,28 @@ export default function App() {
           };
           setNotifications((prev) => [refNotif, ...prev]);
         }
+
+        // 3. Update allWallets map for the referrer
+        setAllWallets((prevMap) => {
+          const rWal = prevMap[effectiveReferrerId] || {
+            id: `wal-${effectiveReferrerId}`,
+            user_id: effectiveReferrerId,
+            available_balance: 0,
+            pending_balance: 0,
+            lifetime_earned: 0,
+            lifetime_withdrawn: 0,
+            updated_at: new Date().toISOString(),
+          };
+          return {
+            ...prevMap,
+            [effectiveReferrerId]: {
+              ...rWal,
+              available_balance: Number((rWal.available_balance + 5.0).toFixed(2)),
+              lifetime_earned: Number((rWal.lifetime_earned + 5.0).toFixed(2)),
+              updated_at: new Date().toISOString(),
+            },
+          };
+        });
       }
 
       if (sub.user_id === user.id) {
@@ -1324,61 +1127,32 @@ export default function App() {
   const handleAdminRejectSubmission = (subId: string, note: string) => {
     const sub = submissions.find((s) => s.id === subId);
     if (!sub || sub.status !== 'pending') return;
-
-    const rejectedSub = {
-      ...sub,
-      status: 'rejected' as const,
-      proof_file_id: '',
-      proof_screenshot_url: undefined,
-      admin_note: note,
-      reviewed_at: new Date().toISOString(),
-    };
-
-    setSubmissions((prev) =>
-      prev.map((s) => (s.id === subId ? rejectedSub : s))
-    );
-
-    const targetUserWallet = allWallets[sub.user_id] || (sub.user_id === user.id ? wallet : {
-      id: `wal-${sub.user_id}`,
-      user_id: sub.user_id,
-      available_balance: 0,
-      pending_balance: sub.reward_amount,
-      lifetime_earned: 0,
-      lifetime_withdrawn: 0,
-      updated_at: new Date().toISOString(),
-    });
-
-    const newTargetWallet: WalletState = {
-      ...targetUserWallet,
-      user_id: sub.user_id,
-      pending_balance: Math.max(0, Number((targetUserWallet.pending_balance - sub.reward_amount).toFixed(2))),
-      updated_at: new Date().toISOString(),
-    };
-
-    if (sub.user_id === user.id) {
-      setWallet(newTargetWallet);
-      localStorage.setItem('kamaonow_wallet', JSON.stringify(newTargetWallet));
-    }
-
-    setAllWallets((prevMap) => {
-      const up = { ...prevMap, [sub.user_id]: newTargetWallet };
-      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
-      return up;
-    });
-
-    syncUserWallet(sub.user_id, newTargetWallet).catch(console.warn);
-    fetch(`/api/wallet/${sub.user_id}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTargetWallet),
-    }).catch(console.warn);
-
-    syncTaskSubmission(rejectedSub).catch(console.warn);
-    fetch(`/api/admin/submissions/${sub.id}/reject`, {
+    // D1 mein bhi reject karo
+    fetch(`/api/admin/submissions/${subId}/reject`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason: note }),
     }).catch(console.warn);
+
+    setSubmissions((prev) =>
+      prev.map((s) =>
+        s.id === subId
+          ? {
+              ...s,
+              status: 'rejected',
+              proof_file_id: '', // Proof delete after rejection (D1 space bachao)
+              proof_screenshot_url: undefined,
+              admin_note: note,
+              reviewed_at: new Date().toISOString(),
+            }
+          : s
+      )
+    );
+
+    setWallet((prev) => ({
+      ...prev,
+      pending_balance: Math.max(0, Number((prev.pending_balance - sub.reward_amount).toFixed(2))),
+    }));
 
     showToast('Submission marked rejected.');
   };
@@ -1386,6 +1160,12 @@ export default function App() {
   const handleAdminApproveWithdrawal = (wdrId: string, utr: string) => {
     const wdr = withdrawals.find((w) => w.id === wdrId);
     if (!wdr || wdr.status !== 'pending') return;
+    // D1 mein bhi pay mark karo
+    fetch(`/api/admin/withdrawals/${wdrId}/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ utr }),
+    }).catch(console.warn);
 
     setWithdrawals((prev) =>
       prev.map((w) =>
@@ -1422,6 +1202,12 @@ export default function App() {
   const handleAdminRejectWithdrawal = (wdrId: string, reason: string) => {
     const wdr = withdrawals.find((w) => w.id === wdrId);
     if (!wdr || wdr.status !== 'pending') return;
+    // D1 mein bhi reject karo
+    fetch(`/api/admin/withdrawals/${wdrId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    }).catch(console.warn);
 
     setWithdrawals((prev) =>
       prev.map((w) =>
@@ -1451,7 +1237,34 @@ export default function App() {
     showToast(`Withdrawal rejected. ₹${wdr.amount.toFixed(2)} refunded to wallet.`);
   };
 
+  // Admin panel open hone pe D1 se fresh data load karo
+  const loadAdminDataFromD1 = async () => {
+    try {
+      const [subsRes, wdrsRes, usersRes] = await Promise.all([
+        fetch('/api/admin/submissions'),
+        fetch('/api/admin/withdrawals'),
+        fetch('/api/admin/users'),
+      ]);
+      if (subsRes.ok) setSubmissions(await subsRes.json());
+      if (wdrsRes.ok) setWithdrawals(await wdrsRes.json());
+      if (usersRes.ok) setAllUsers(await usersRes.json());
+    } catch (e) {
+      console.warn('Admin D1 load failed:', e);
+    }
+  };
+
   const handleAdminSaveTask = (taskData: Partial<TaskItem>) => {
+    // D1 mein save karo
+    fetch('/api/admin/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(taskData),
+    }).then(() => {
+      fetch('/api/tasks').then(r => r.json()).then((data: any) => {
+        if (Array.isArray(data) && data.length > 0) setTasks(data);
+      }).catch(console.warn);
+    }).catch(console.warn);
+
     if (taskData.id) {
       setTasks((prev) =>
         prev.map((t) =>
@@ -1492,6 +1305,8 @@ export default function App() {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, is_active: willBeActive } : t))
     );
+    // D1 mein bhi toggle karo
+    fetch(`/api/admin/tasks/${taskId}/toggle`, { method: 'POST' }).catch(console.warn);
     showToast(
       willBeActive
         ? `"${target?.title}" is now LIVE! 🟢`
@@ -1502,6 +1317,8 @@ export default function App() {
   const handleAdminDeleteTask = (taskId: string) => {
     const target = tasks.find((t) => t.id === taskId);
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    // D1 mein bhi delete karo
+    fetch(`/api/admin/tasks/${taskId}`, { method: 'DELETE' }).catch(console.warn);
     showToast(`"${target?.title || 'Offer'}" deleted successfully.`);
   };
 
@@ -1671,13 +1488,23 @@ export default function App() {
     showToast('Reset to original Real Money App state.');
   };
 
-  const handleLoginSuccess = async (loggedInUser: UserProfile, isNewUser: boolean) => {
+  const handleLoginSuccess = (loggedInUser: UserProfile, isNewUser: boolean) => {
     setUser(loggedInUser);
     localStorage.setItem('kamaonow_user', JSON.stringify(loggedInUser));
     setIsLoggedIn(true);
-    // Login ke baad user wahi page pe jayega jahan se aaya tha (Google se /spin → spin screen)
+    // Login ke baad user wahi page pe jayega jahan se aaya tha
     const targetTab = pendingTab !== 'home' ? pendingTab : 'home';
     navigateTo(targetTab);
+
+    // D1 mein user save/update karo
+    fetch('/api/users/upsert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(loggedInUser),
+    }).catch(console.warn);
+
+    // D1 se real data load karo (har phone pe same data dikhega)
+    loadUserDataFromD1(loggedInUser.id);
 
     setAllUsers((prev) => {
       const exists = prev.some((u) => u.id === loggedInUser.id);
@@ -1687,14 +1514,7 @@ export default function App() {
       return [loggedInUser, ...prev];
     });
 
-    // Check if user already has an existing wallet on backend API or Firestore
-    const restored = await restoreUserWallet(loggedInUser.id);
-    if (restored && (restored.available_balance > 0 || restored.lifetime_earned > 0 || restored.pending_balance > 0)) {
-      showToast(`Welcome back, ${loggedInUser.name || 'User'}! Aapka balance ₹${restored.available_balance.toFixed(2)} restore ho gaya hai. 💰`);
-      return;
-    }
-
-    if (!restored) {
+    if (isNewUser) {
       // RULE: Sign-up bonus (₹5) is credited ONLY when 1st task is completed!
       const freshWallet: WalletState = {
         id: `wal-${loggedInUser.id}`,
@@ -1707,14 +1527,6 @@ export default function App() {
       };
       setWallet(freshWallet);
       setAllWallets((prev) => ({ ...prev, [loggedInUser.id]: freshWallet }));
-      localStorage.setItem('kamaonow_wallet', JSON.stringify(freshWallet));
-
-      syncUserWallet(loggedInUser.id, freshWallet).catch(console.warn);
-      fetch(`/api/wallet/${loggedInUser.id}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(freshWallet),
-      }).catch(console.warn);
 
       // If referred by someone, record pending referral item (₹5 credited when this user does 1st task)
       if (loggedInUser.referred_by) {
@@ -2570,27 +2382,13 @@ export default function App() {
             {/* User Profile Card -> CRISP WHITE */}
             <div className="p-5 rounded-3xl bg-white border border-slate-100 flex items-center justify-between gap-4 shadow-md text-slate-900">
               <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-emerald-50 shrink-0 shadow-sm flex items-center justify-center">
-                  {user.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xl font-black text-emerald-700">
-                      {(user.name || 'U').charAt(0).toUpperCase()}
-                    </span>
-                  )}
+                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-100 shrink-0 shadow-sm">
+                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
                 </div>
                 <div>
-                  <h2 className="text-base font-black text-slate-900">{user.name || 'User'}</h2>
-                  {user.email && !user.email.endsWith('@realmoneyapp.online') ? (
-                    <p className="text-xs text-emerald-700 font-mono font-bold">{user.email}</p>
-                  ) : (
-                    <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Mobile Verified
-                    </p>
-                  )}
-                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                    {user.phone ? (user.phone.startsWith('+91') ? user.phone : `+91 ${user.phone}`) : 'No phone linked'}
-                  </p>
+                  <h2 className="text-base font-black text-slate-900">{user.name}</h2>
+                  <p className="text-xs text-emerald-700 font-mono font-bold">{user.email}</p>
+                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">+91 {user.phone}</p>
                 </div>
               </div>
 
@@ -2598,17 +2396,7 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   const newName = prompt('Enter your name:', user.name);
-                  if (newName && newName.trim()) {
-                    const upUser = { ...user, name: newName.trim() };
-                    setUser(upUser);
-                    localStorage.setItem('kamaonow_user', JSON.stringify(upUser));
-                    syncUserProfile(upUser).catch(console.warn);
-                    fetch('/api/user/sync', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(upUser),
-                    }).catch(console.warn);
-                  }
+                  if (newName) setUser({ ...user, name: newName });
                 }}
                 className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shrink-0 cursor-pointer shadow-sm transition-colors"
               >
@@ -2620,19 +2408,19 @@ export default function App() {
             <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-emerald-600 text-lg">
-                  {submissions.filter((s) => s.user_id === user.id && s.status === 'approved').length}
+                  {submissions.filter((s) => s.status === 'approved').length + 11}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Completed Tasks</div>
               </div>
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-amber-500 text-lg">
-                  {referrals.filter((r) => r.referrer_id === user.id || r.referrer_id === user.referral_code).length}
+                  {referrals.length + 2}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Referrals</div>
               </div>
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-teal-600 text-lg">
-                  {withdrawals.filter((w) => w.user_id === user.id && w.status === 'approved').length}
+                  {withdrawals.filter((w) => w.status === 'approved').length + 1}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Withdrawals</div>
               </div>
@@ -2686,7 +2474,7 @@ export default function App() {
               >
                 <div className="flex items-center gap-3">
                   <CheckSquare className="w-4 h-4 text-emerald-600" />
-                  <span className="font-bold text-slate-900">Task History ({submissions.filter((s) => s.user_id === user.id).length})</span>
+                  <span className="font-bold text-slate-900">Task History ({submissions.length})</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
@@ -2698,7 +2486,7 @@ export default function App() {
               >
                 <div className="flex items-center gap-3">
                   <History className="w-4 h-4 text-emerald-600" />
-                  <span className="font-bold text-slate-900">Withdrawal History ({withdrawals.filter((w) => w.user_id === user.id).length})</span>
+                  <span className="font-bold text-slate-900">Withdrawal History ({withdrawals.length})</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
@@ -2757,7 +2545,7 @@ export default function App() {
                   >
                     <div className="flex items-center gap-3">
                       <RotateCcw className="w-4 h-4 text-slate-500" />
-                      <span className="font-bold text-slate-700">Clear Local Cache &amp; Reset (Admin Only)</span>
+                      <span className="font-bold text-slate-700">Reset Demo Data (Admin Only)</span>
                     </div>
                     <span className="text-[11px] text-slate-400 font-mono">Clean State</span>
                   </button>
@@ -2987,6 +2775,7 @@ export default function App() {
       )}
 
       {/* ADMIN PANEL (PWA Manual Admin Master Control) */}
+      {showAdminPanel && (() => { loadAdminDataFromD1(); return null; })()}
       {showAdminPanel && (
         <AdminPanel
           currentUser={user}

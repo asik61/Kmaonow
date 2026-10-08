@@ -2,7 +2,7 @@
   "users": [
     {
       "id": "usr-6202636470",
-      "name": "Asik Khan",
+      "name": "Asik Khan (Master Admin)",
       "phone": "+91 62026 36470",
       "email": "asik94906@gmail.com",
       "referral_code": "REALHQ",
@@ -15,107 +15,53 @@
   ],
   "tasks": [
     {
-      "id": "task-1",
-      "title": "Zupee App Download",
-      "subtitle": "Install & Play 1 Ludo Game",
-      "description": "Zupee download karein aur 1 free ludo game complete karein. Screenshot proof submit karein.",
-      "category": "Installed",
-      "reward_amount": 15,
-      "instructions": [
-        "Download link par click karke Zupee install karein.",
-        "Mobile number se register karein.",
-        "Koi bhi 1 free game play karein.",
-        "Home profile screen ka screenshot lekar submit karein."
-      ],
-      "partner_url": "https://example.com/zupee",
-      "icon_label": "ZUP",
-      "icon_bg": "#E11D48",
-      "status": "active",
-      "is_top_offer": true,
-      "is_trending": true,
-      "created_at": "2026-09-28T09:00:00Z"
-    },
-    {
-      "id": "task-2",
-      "title": "Navi Mutual Fund KYC",
-      "subtitle": "Open Demat & Invest ₹10",
-      "description": "Navi App me Aadhaar & PAN se free KYC complete karein aur ₹10 invest karein.",
-      "category": "Register",
-      "reward_amount": 50,
-      "instructions": [
-        "Navi app install karein aur phone number verify karein.",
-        "PAN aur Aadhaar number enter karke instant KYC complete karein.",
-        "Portfolio page ka screenshot submit karein."
-      ],
-      "partner_url": "https://example.com/navi",
-      "icon_label": "NAV",
-      "icon_bg": "#2563EB",
-      "status": "active",
-      "is_top_offer": true,
-      "is_trending": false,
-      "created_at": "2026-09-29T11:00:00Z"
-    },
-    {
-      "id": "task-3",
-      "title": "Kuku FM Subscription Demo",
-      "subtitle": "Free 7-Day Trial Activate",
-      "description": "Kuku FM audiobooks ka 7-day trial activate karein aur confirmation screen upload karein.",
+      "id": "task-admin-navi-01",
+      "title": "Navi: UPI, Loans & Mutual Funds",
+      "subtitle": "Install & Register with Mobile",
+      "description": "Download Navi app from Play Store, complete registration using your mobile number, setup UPI or start investing with just ₹10 to unlock ₹25 instant cash reward.",
       "category": "Register",
       "reward_amount": 25,
       "instructions": [
-        "Kuku FM par signup karein.",
-        "Free trial activate karein.",
-        "Trial active screen ka screenshot upload karein."
+        "Click on \"Start Offer\" button to open Navi App in Google Play Store.",
+        "Download and install the official Navi app on your mobile phone.",
+        "Open the app and complete registration with your active mobile number and OTP.",
+        "Link your bank account with UPI or complete KYC verification.",
+        "Take a clear screenshot of the Navi home screen / registered profile page.",
+        "Upload the screenshot here and tap Submit Proof to receive ₹25 cash reward directly in your wallet!"
       ],
-      "partner_url": "https://example.com/kukufm",
-      "icon_label": "KKF",
-      "icon_bg": "#EA580C",
+      "partner_url": "https://play.google.com/store/apps/details?id=com.naviapp",
+      "icon_label": "NAVI",
+      "icon_bg": "#059669",
+      "image_url": "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=400&q=80",
       "status": "active",
-      "is_top_offer": false,
+      "is_top_offer": true,
       "is_trending": true,
-      "created_at": "2026-09-30T08:00:00Z"
+      "created_at": "2026-10-01T10:00:00Z"
     }
   ],
   "task_submissions": [],
   "wallets": [
     {
-      "id": "wal-1791428940191",
+      "id": "wal-6202636470",
       "user_id": "usr-6202636470",
-      "available_balance": 0.5,
-      "pending_balance": 0,
-      "lifetime_earned": 0.5,
-      "lifetime_withdrawn": 0,
-      "updated_at": "2026-10-08T03:09:04.496Z"
+      "available_balance": 0.00,
+      "pending_balance": 0.00,
+      "lifetime_earned": 0.00,
+      "lifetime_withdrawn": 0.00,
+      "updated_at": "2026-10-08T00:00:00.000Z"
     }
   ],
-  "ledger": [
-    {
-      "id": "led-1791428944496",
-      "user_id": "usr-6202636470",
-      "type": "spin_reward",
-      "amount": 0.5,
-      "status": "credit",
-      "description": "Daily Lucky Spin #1 Reward: ₹0.50",
-      "created_at": "2026-10-08T03:09:04.496Z"
-    }
-  ],
+  "ledger": [],
   "referrals": [],
-  "spin_history": [
-    {
-      "id": "spin-1791428944495",
-      "user_id": "usr-6202636470",
-      "reward_amount": 0.5,
-      "created_at": "2026-10-08T03:09:04.495Z"
-    }
-  ],
+  "spin_history": [],
   "scratch_history": [],
   "withdrawals": [],
   "daily_bonus": [],
   "admin_users": [
     {
       "id": "adm-1",
-      "name": "Super Admin",
-      "email": "admin@kamaonow.com",
+      "name": "Asik Khan (Master Admin)",
+      "email": "asik94906@gmail.com",
       "role": "super_admin",
       "password_hash": "admin123",
       "created_at": "2026-09-01T00:00:00Z"

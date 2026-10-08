@@ -128,17 +128,12 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     }
   };
 
-  // Suggested Google Accounts for fast prototyping
+  // Master Admin Account for Quick Access
   const defaultGoogleAccounts: GoogleAccount[] = [
     {
-      name: 'Asik',
+      name: 'Asik Khan (Master Admin)',
       email: 'asik94906@gmail.com',
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-    },
-    {
-      name: 'Aman Sharma',
-      email: 'amansharma.work@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
     },
   ];
 
@@ -410,9 +405,7 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
             is_blocked: false,
             is_verified: true,
             role: isMasterAdmin ? 'admin' : 'user',
-            avatar_url:
-              googleUser?.avatar ||
-              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+            avatar_url: googleUser?.avatar || '',
             created_at: new Date().toISOString(),
           };
 
@@ -442,7 +435,7 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       name: 'Asik Khan (Master Admin)',
       phone: '+91 62026 36470',
       email: 'asik94906@gmail.com',
-      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+      avatar_url: '',
       referral_code: 'REALHQ',
       referred_by: null,
       is_blocked: false,
@@ -660,13 +653,13 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
                 <ArrowRight className="w-4 h-4 ml-auto text-emerald-200 group-hover:translate-x-1 transition-transform" />
               </button>
 
-              {/* Direct Demo Link */}
+              {/* Direct Admin Login */}
               <button
                 type="button"
                 onClick={handleQuickDemo}
                 className="w-full py-2 text-center text-xs text-slate-400 hover:text-emerald-700 font-medium transition-colors cursor-pointer"
               >
-                Direct Demo Master Admin Se Kholen &rarr;
+                Master Admin Desk (asik94906@gmail.com) Se Kholen &rarr;
               </button>
             </div>
 

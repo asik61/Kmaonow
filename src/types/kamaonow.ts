@@ -71,6 +71,7 @@ export type LedgerType =
   | 'spin_reward'
   | 'scratch_reward'
   | 'daily_bonus'
+  | 'bonus'
   | 'referral_bonus'
   | 'withdrawal'
   | 'withdrawal_refund'

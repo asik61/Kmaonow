@@ -14,7 +14,9 @@ interface ScratchCardProps {
   freeScratchesLeft?: number;
   totalDailyScratches?: number;
   dailyClaimed: boolean;
+  walletBalance?: number;
   onRewardWon: (amount: number) => void;
+  onUnlockBonusScratch?: () => void;
   onBack?: () => void;
   onOpenRules?: () => void;
   onOpenNotifications?: () => void;
@@ -34,7 +36,9 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
   freeScratchesLeft = 3,
   totalDailyScratches = 3,
   dailyClaimed,
+  walletBalance = 0,
   onRewardWon,
+  onUnlockBonusScratch,
   onBack,
   onOpenRules,
   onOpenNotifications,

@@ -14,7 +14,9 @@ interface SpinWheelProps {
   freeSpinsLeft?: number;
   totalDailySpins?: number;
   dailyClaimed: boolean;
+  walletBalance?: number;
   onRewardWon: (amount: number) => void;
+  onUnlockBonusSpin?: () => void;
   onBack?: () => void;
   onOpenRules?: () => void;
   onOpenNotifications?: () => void;
@@ -119,7 +121,9 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
   freeSpinsLeft = 3,
   totalDailySpins = 3,
   dailyClaimed,
+  walletBalance = 0,
   onRewardWon,
+  onUnlockBonusSpin,
   onBack,
   onOpenRules,
   onOpenNotifications,
@@ -491,12 +495,18 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
           <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
         </button>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          {/* Live Wallet Balance Chip */}
+          <div className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-black flex items-center gap-1.5 shadow-xs">
+            <span className="text-sm">💰</span>
+            <span className="font-mono">₹{walletBalance.toFixed(2)}</span>
+          </div>
+
           {/* Niyam (Rules) Button */}
           <button
             type="button"
             onClick={onOpenRules}
-            className="px-3.5 py-1.5 rounded-full bg-amber-100/90 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-black flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
+            className="px-3 py-1.5 rounded-full bg-amber-100/90 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
           >
             <span className="text-sm">📒</span>
             <span>Niyam</span>
@@ -624,13 +634,23 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
             <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium pt-0.5">
               <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-pulse" />
               <span>
-                Naye 3 Spins:{' '}
+                Naye 3 Daily Spins:{' '}
                 <strong className="font-mono font-black text-slate-800">
                   {midnightTimer || '00:00:00'}
                 </strong>{' '}
-                mein unlock honge
+                mein reset honge
               </span>
             </div>
+
+            {onUnlockBonusSpin && (
+              <button
+                type="button"
+                onClick={onUnlockBonusSpin}
+                className="w-full mt-1.5 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white font-black text-xs shadow-md hover:from-emerald-500 hover:to-emerald-600 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+              >
+                <span>🎁 Unlock +1 Free Bonus Spin (Instant)</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="p-3.5 rounded-2xl bg-white border border-emerald-200 shadow-sm text-center space-y-2">
@@ -679,11 +699,13 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
       <div className="w-[92%] max-w-sm mx-auto mb-3">
         <button
           type="button"
-          onClick={doSpin}
-          disabled={isSpinning || isOutOfSpins}
+          onClick={isOutOfSpins ? onUnlockBonusSpin : doSpin}
+          disabled={isSpinning}
           className={`w-full py-4 px-6 rounded-full font-black text-base transition-all flex items-center justify-between shadow-xl cursor-pointer active:scale-98 ${
-            isSpinning || isOutOfSpins
+            isSpinning
               ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border border-slate-300'
+              : isOutOfSpins
+              ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white shadow-[0_10px_28px_rgba(16,185,129,0.35)] hover:shadow-[0_12px_32px_rgba(16,185,129,0.45)]'
               : 'bg-gradient-to-r from-[#00A8FF] via-[#0070F3] to-[#0051FF] text-white shadow-[0_10px_28px_rgba(0,112,243,0.45)] hover:shadow-[0_12px_32px_rgba(0,112,243,0.55)]'
           }`}
         >
@@ -694,7 +716,7 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
             {isSpinning
               ? 'Ghoom Raha Hai...'
               : isOutOfSpins
-              ? 'All 3 Spins Claimed Today ✓'
+              ? '🎁 Unlock Bonus Spin Now'
               : `Spin Now (${freeSpinsLeft}/3 Left)`}
           </span>
           <ChevronRight className="w-5 h-5 stroke-[2.5]" />
@@ -708,10 +730,10 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
         <div className="py-2.5 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center gap-3">
           <span className="flex items-center gap-1 text-emerald-700">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>100% Secure</span>
+            <span>100% Instant Credit</span>
           </span>
           <span className="text-slate-300">•</span>
-          <span>Daily 3 Free Spins</span>
+          <span>Daily 3 Free Spins + Bonus</span>
         </div>
       </div>
 
@@ -732,10 +754,16 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
               <div className="text-5xl font-black text-emerald-600 py-1 font-mono">
                 {wonSegment.label}
               </div>
-              <p className="text-xs text-slate-500 font-medium">
+              <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold space-y-0.5">
+                <div>✓ Seedha Aapke Wallet Me Credit Ho Gaya!</div>
+                <div className="text-sm font-black font-mono text-emerald-700">
+                  Total Wallet: ₹{(walletBalance + wonSegment.value).toFixed(2)}
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 font-medium pt-1">
                 {freeSpinsLeft - 1 > 0
-                  ? `Wallet me credit ho gaya! (${freeSpinsLeft - 1} spins abhi baaki hain)`
-                  : 'Wallet me instant credit ho gaya! Aaj ke 3 spins pure ho gaye.'}
+                  ? `Abhi ${freeSpinsLeft - 1} spins baaki hain!`
+                  : 'Aaj ke 3 spins pure ho gaye! Naya bonus spin unlock karein.'}
               </p>
             </div>
             <button
@@ -743,9 +771,7 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
               onClick={handleClaim}
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-sm shadow-md cursor-pointer active:scale-95 transition-all"
             >
-              {freeSpinsLeft - 1 > 0
-                ? `Claim & Play Next (${freeSpinsLeft - 1} Left)`
-                : 'Claim & Collect Cash ✓'}
+              Collect ₹{wonSegment.label} &amp; Done ✓
             </button>
           </div>
         </div>

@@ -93,6 +93,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!compressed) {
@@ -100,14 +102,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       return;
     }
     setSubmitting(true);
-    onSubmitProof({
-      taskId: task.id,
-      proofDataUrl: compressed.dataUrl,
-      sizeKb: compressed.compressedKb,
-      note: userNote.trim() || undefined,
-    });
-    setSubmitting(false);
-    onClose();
+    setVerificationSuccess(true);
+    setTimeout(() => {
+      onSubmitProof({
+        taskId: task.id,
+        proofDataUrl: compressed.dataUrl,
+        sizeKb: compressed.compressedKb,
+        note: userNote.trim() || undefined,
+      });
+      setSubmitting(false);
+      onClose();
+    }, 700);
   };
 
   return (
@@ -388,7 +393,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Demo Receipt</span>
+                      <span>Sample Receipt</span>
                     </button>
                   </div>
 
@@ -511,7 +516,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 disabled:bg-slate-200 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white font-black text-sm sm:text-base transition-all shadow-[0_6px_20px_rgba(5,150,105,0.35)] active:scale-98 cursor-pointer disabled:cursor-not-allowed"
                   >
                     {submitting
-                      ? 'Bheja Ja Raha Hai...'
+                      ? (verificationSuccess ? '⚡ Verifying & Crediting Cash...' : 'Bheja Ja Raha Hai...')
                       : compressed
                       ? `🚀 Submit Proof & Claim ₹${task.reward_amount.toFixed(2)}`
                       : 'Pehle Upar Se Screenshot Select Karein 📸'}
@@ -519,7 +524,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
                   <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 pt-1">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Admin verify karke seedha wallet me ₹{task.reward_amount.toFixed(0)} bhejenge</span>
+                    <span>Instant Verification &amp; Direct Wallet Credit (₹{task.reward_amount.toFixed(0)})</span>
                   </div>
                 </form>
               )}

@@ -159,3 +159,14 @@ CREATE INDEX IF NOT EXISTS idx_ledger_user ON ledger(user_id);
 CREATE INDEX IF NOT EXISTS idx_withdrawals_user ON withdrawals(user_id);
 CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals(status);
 CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
+
+-- Broadcast Notices table
+CREATE TABLE IF NOT EXISTS notices (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT DEFAULT 'success',
+  is_active INTEGER DEFAULT 1,
+  author TEXT DEFAULT 'Admin',
+  created_at TEXT DEFAULT (datetime('now'))
+);

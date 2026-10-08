@@ -76,7 +76,16 @@ import { HomeBannerSlider } from './components/HomeBannerSlider';
 import { EarningsCardImage } from './components/EarningsCardImage';
 import { AuthScreen } from './components/AuthScreen';
 import { SplashScreen } from './components/SplashScreen';
-import { testConnection, syncUserWallet, logoutFromFirebase } from './services/firebase';
+import {
+  testConnection,
+  syncUserProfile,
+  syncUserWallet,
+  fetchUserWallet,
+  syncTaskSubmission,
+  fetchUserSubmissions,
+  fetchAllSubmissions,
+  logoutFromFirebase,
+} from './services/firebase';
 import { NotificationModal } from './components/NotificationModal';
 import { RulesModal } from './components/RulesModal';
 import {
@@ -86,6 +95,49 @@ import {
 } from './services/notifications';
 
 type NavTab = 'home' | 'tasks' | 'spin' | 'scratch' | 'profile' | 'offers' | 'refer' | 'daily' | 'withdraw';
+
+// ─── URL ↔ Tab Mapping ────────────────────────────────────────────────────────
+// Clean URLs: /spin, /tasks, /scratch, /refer, /daily
+// Home stays at /
+const PATH_TO_TAB: Record<string, NavTab> = {
+  '/':        'home',
+  '/tasks':   'tasks',
+  '/offers':  'offers',
+  '/spin':    'spin',
+  '/scratch': 'scratch',
+  '/refer':   'refer',
+  '/daily':   'daily',
+};
+
+const TAB_TO_PATH: Record<NavTab, string> = {
+  home:     '/',
+  tasks:    '/tasks',
+  offers:   '/offers',
+  spin:     '/spin',
+  scratch:  '/scratch',
+  refer:    '/refer',
+  daily:    '/daily',
+  profile:  '/',   // profile modal style — URL nahi badlega
+  withdraw: '/',   // withdraw modal style — URL nahi badlega
+};
+
+const TAB_TITLES: Record<NavTab, string> = {
+  home:     'Real Money App – Roz Paise Kamao | realmoneyapp.online',
+  tasks:    'Tasks & Offers – Paise Kamao | Real Money App',
+  offers:   'Top Offers – High Paying Tasks | Real Money App',
+  spin:     'Daily Free Lucky Spin – Win Real Cash | Real Money App',
+  scratch:  'Free Scratch Card – Daily Cash Prizes | Real Money App',
+  refer:    'Refer & Earn ₹5 Per Friend | Real Money App',
+  daily:    'Daily Bonus – Roz ₹0.50 Free | Real Money App',
+  profile:  'My Profile & Earnings | Real Money App',
+  withdraw: 'Instant UPI Withdrawal | Real Money App',
+};
+
+// URL se tab nikalo (fallback: home)
+function getTabFromPath(): NavTab {
+  const path = window.location.pathname;
+  return PATH_TO_TAB[path] ?? 'home';
+}
 
 const TaskIconBadge: React.FC<{
   imageUrl?: string;
@@ -122,19 +174,39 @@ const TaskIconBadge: React.FC<{
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('home');
+  // Tab URL se initialize hoga — Google se /spin pe aaya to spin khulega
+  const [activeTab, setActiveTab] = useState<NavTab>(() => getTabFromPath());
+  // Login ke pehle ka URL yaad rakhne ke liye
+  const [pendingTab, setPendingTab] = useState<NavTab>(() => getTabFromPath());
   const [taskCategory, setTaskCategory] = useState<TaskCategory>('All');
   const [offerCategory, setOfferCategory] = useState<'All' | 'Top Offers' | 'Trending' | 'New'>('All');
 
   // Core Data
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('kamaonow_user');
-    return saved ? JSON.parse(saved) : INITIAL_USER;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id && parsed.id !== 'usr-rohan-01') {
+          return parsed;
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return INITIAL_USER;
   });
 
   const [showSplash, setShowSplash] = useState<boolean>(true);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return !!localStorage.getItem('kamaonow_user');
+    const saved = localStorage.getItem('kamaonow_user');
+    if (!saved) return false;
+    try {
+      const parsed = JSON.parse(saved);
+      return !!(parsed && parsed.id && parsed.id !== 'usr-rohan-01');
+    } catch {
+      return false;
+    }
   });
 
   const [wallet, setWallet] = useState<WalletState>(() => {
@@ -142,11 +214,10 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // If demo user or user with 0 earned, ensure clean 0.00 lifetime_withdrawn
-        if (parsed.user_id === 'usr-rohan-01' || (parsed.lifetime_earned === 0 && parsed.available_balance === 0)) {
-          return INITIAL_WALLET;
+        if (parsed && parsed.user_id && parsed.user_id !== 'usr-rohan-01') {
+          return parsed;
         }
-        return parsed;
+        return INITIAL_WALLET;
       } catch {
         return INITIAL_WALLET;
       }
@@ -283,12 +354,45 @@ export default function App() {
   // Admin & Multi-User Directory State
   const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem('kamaonow_all_users');
-    return saved ? JSON.parse(saved) : INITIAL_USERS_LIST;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            (u: UserProfile) =>
+              u &&
+              u.id &&
+              !['usr-rohan-01', 'usr-priya-02', 'usr-amit-03', 'usr-vicky-04', 'usr-neha-05', 'usr-rajesh-06', 'usr-demo-001'].includes(u.id)
+          );
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return INITIAL_USERS_LIST;
   });
 
   const [allWallets, setAllWallets] = useState<Record<string, WalletState>>(() => {
     const saved = localStorage.getItem('kamaonow_all_wallets');
-    return saved ? JSON.parse(saved) : INITIAL_WALLETS_MAP;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          const cleaned: Record<string, WalletState> = {};
+          Object.keys(parsed).forEach((k) => {
+            if (
+              !['usr-rohan-01', 'usr-priya-02', 'usr-amit-03', 'usr-vicky-04', 'usr-neha-05', 'usr-rajesh-06', 'usr-demo-001'].includes(k)
+            ) {
+              cleaned[k] = parsed[k];
+            }
+          });
+          return cleaned;
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return INITIAL_WALLETS_MAP;
   });
 
   const [notices, setNotices] = useState<BroadcastNotice[]>(() => {
@@ -318,7 +422,7 @@ export default function App() {
     // Auto-migrate legacy localStorage to ensure clean 1st withdrawal and clean custom offers
     const MIGRATION_KEY = 'realmoney_v12_clean_all_demo_offers';
     if (!localStorage.getItem(MIGRATION_KEY)) {
-      if (user.id === 'usr-rohan-01' || (wallet.lifetime_earned === 0 && wallet.available_balance === 0)) {
+      if (user.id === 'usr-rohan-01') {
         setWallet(INITIAL_WALLET);
         localStorage.setItem('kamaonow_wallet', JSON.stringify(INITIAL_WALLET));
       }
@@ -428,6 +532,37 @@ export default function App() {
     localStorage.setItem('realmoney_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
+  // ─── navigateTo: tab change + URL update + title update ───────────────────
+  const navigateTo = (tab: NavTab) => {
+    setActiveTab(tab);
+    const path = TAB_TO_PATH[tab];
+    const title = TAB_TITLES[tab];
+    // Browser URL update (back button kaam karega)
+    if (window.location.pathname !== path) {
+      window.history.pushState({ tab }, title, path);
+    }
+    // Page title update
+    document.title = title;
+  };
+
+  // Browser back/forward button support
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      const tab = (e.state?.tab as NavTab) || getTabFromPath();
+      setActiveTab(tab);
+      document.title = TAB_TITLES[tab];
+    };
+    window.addEventListener('popstate', handlePopState);
+    // Initial state set karo taaki back button pehle page pe bhi kaam kare
+    window.history.replaceState({ tab: activeTab }, document.title, TAB_TO_PATH[activeTab]);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Title initial set
+  useEffect(() => {
+    document.title = TAB_TITLES[activeTab];
+  }, [activeTab]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -453,11 +588,24 @@ export default function App() {
       submitted_at: new Date().toISOString(),
     };
 
-    setSubmissions([newSub, ...submissions]);
-    setWallet((prev) => ({
-      ...prev,
-      pending_balance: prev.pending_balance + targetTask.reward_amount,
-    }));
+    const updatedPending = Number((wallet.pending_balance + targetTask.reward_amount).toFixed(2));
+    const updatedWallet: WalletState = {
+      ...wallet,
+      user_id: user.id,
+      pending_balance: updatedPending,
+      updated_at: new Date().toISOString(),
+    };
+
+    setSubmissions((prev) => [newSub, ...prev]);
+    localStorage.setItem('kamaonow_submissions', JSON.stringify([newSub, ...submissions]));
+
+    setWallet(updatedWallet);
+    localStorage.setItem('kamaonow_wallet', JSON.stringify(updatedWallet));
+    setAllWallets((prev) => {
+      const up = { ...prev, [user.id]: updatedWallet };
+      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
+      return up;
+    });
 
     // In-App Notification
     const notif: InAppNotification = {
@@ -477,32 +625,213 @@ export default function App() {
     }).catch(console.warn);
 
     showToast(`Screenshot submit ho gaya! ₹${targetTask.reward_amount.toFixed(2)} under review hai. 🎉`);
+
+    // Persistent Cloud & Backend Sync
+    syncUserWallet(user.id, updatedWallet).catch(console.warn);
+    fetch(`/api/wallet/${user.id}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedWallet),
+    }).catch(console.warn);
+
+    syncTaskSubmission(newSub).catch(console.warn);
+    fetch(`/api/tasks/${targetTask.id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, proofFileId: payload.proofDataUrl }),
+    }).catch(console.warn);
   };
 
-  // Spin Reward Won (Daily 3 Free Spins)
-  const handleSpinWon = (amount: number) => {
+  // ─── restoreUserWallet: Cloud & Backend Sync (No balance lost on reinstall/login) ───
+  const restoreUserWallet = async (targetUserId: string): Promise<WalletState | null> => {
+    try {
+      // 1. Check Backend API (/api/wallet/:userId)
+      let serverWallet: WalletState | null = null;
+      try {
+        const res = await fetch(`/api/wallet/${targetUserId}`);
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          if (data && (data.available_balance !== undefined || data.balance !== undefined)) {
+            serverWallet = {
+              id: data.id || `wal-${targetUserId}`,
+              user_id: targetUserId,
+              available_balance: Number(data.available_balance ?? data.balance ?? 0),
+              pending_balance: Number(data.pending_balance ?? 0),
+              lifetime_earned: Number(data.lifetime_earned ?? 0),
+              lifetime_withdrawn: Number(data.lifetime_withdrawn ?? 0),
+              updated_at: data.updated_at || new Date().toISOString(),
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Backend wallet lookup:', e);
+      }
+
+      // 2. Check Firestore (wallets/:userId)
+      let firestoreWallet: WalletState | null = null;
+      try {
+        firestoreWallet = await fetchUserWallet(targetUserId);
+      } catch (e) {
+        console.warn('Firestore wallet lookup:', e);
+      }
+
+      // 3. Check local allWallets cache
+      const localCandidate = allWallets[targetUserId];
+
+      const candidates = [serverWallet, firestoreWallet, localCandidate].filter(
+        (w): w is WalletState =>
+          !!w &&
+          (w.available_balance > 0 || w.lifetime_earned > 0 || w.lifetime_withdrawn > 0 || w.pending_balance > 0)
+      );
+
+      if (candidates.length === 0 && (serverWallet || firestoreWallet)) {
+        const fallback = serverWallet || firestoreWallet;
+        if (fallback) candidates.push(fallback);
+      }
+
+      let bestWallet: WalletState | null = null;
+      if (candidates.length > 0) {
+        // Pick the most updated wallet with highest earnings
+        candidates.sort(
+          (a, b) => b.lifetime_earned - a.lifetime_earned || b.available_balance - a.available_balance
+        );
+        bestWallet = candidates[0];
+
+        setWallet(bestWallet);
+        localStorage.setItem('kamaonow_wallet', JSON.stringify(bestWallet));
+        setAllWallets((prev) => {
+          const up = { ...prev, [targetUserId]: bestWallet! };
+          localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
+          return up;
+        });
+
+        // Sync both backend and Firestore to keep them updated
+        syncUserWallet(targetUserId, bestWallet).catch(console.warn);
+        fetch(`/api/wallet/${targetUserId}/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bestWallet),
+        }).catch(console.warn);
+      }
+
+      // Restore Ledger from Backend API
+      try {
+        const ledRes = await fetch(`/api/ledger/${targetUserId}`);
+        if (ledRes.ok) {
+          const ledData = (await ledRes.json()) as LedgerItem[];
+          if (Array.isArray(ledData) && ledData.length > 0) {
+            setLedger((prev) => {
+              const combined = [...ledData];
+              prev.forEach((p) => {
+                if (!combined.some((c) => c.id === p.id)) combined.push(p);
+              });
+              localStorage.setItem('kamaonow_ledger', JSON.stringify(combined));
+              return combined;
+            });
+          }
+        }
+      } catch {
+        // fallback
+      }
+
+      // Restore Submissions from Firestore & Backend
+      try {
+        const cloudSubs = await fetchUserSubmissions(targetUserId);
+        let sList = cloudSubs;
+        if (!sList || sList.length === 0) {
+          const sRes = await fetch(`/api/submissions/user/${targetUserId}`);
+          if (sRes.ok) sList = await sRes.json();
+        }
+        if (Array.isArray(sList) && sList.length > 0) {
+          setSubmissions((prev) => {
+            const combined = [...prev];
+            sList.forEach((cs: any) => {
+              const idx = combined.findIndex((c) => c.id === cs.id);
+              if (idx >= 0) {
+                combined[idx] = { ...combined[idx], ...cs };
+              } else {
+                combined.unshift(cs);
+              }
+            });
+            localStorage.setItem('kamaonow_submissions', JSON.stringify(combined));
+            return combined;
+          });
+        }
+      } catch (e) {
+        console.warn('Submissions restore fallback:', e);
+      }
+
+      return bestWallet;
+    } catch (err) {
+      console.warn('restoreUserWallet error:', err);
+      return null;
+    }
+  };
+
+  // Restore wallet whenever logged in user opens app or session boots
+  useEffect(() => {
+    if (isLoggedIn && user?.id) {
+      restoreUserWallet(user.id);
+    }
+  }, [user.id, isLoggedIn]);
+
+  // Spin Reward Won (Daily 3 Free Spins — instant credit & cloud synced)
+  const handleSpinWon = async (amount: number) => {
     const today = new Date().toISOString().slice(0, 10);
     const savedDate = localStorage.getItem('realmoney_spin_date');
-    let usedToday = 0;
-    if (savedDate === today) {
-      usedToday = parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10);
+    let usedToday = savedDate === today ? parseInt(localStorage.getItem('realmoney_spins_count') || '0', 10) : 0;
+
+    if (usedToday >= 3) {
+      setFreeSpinsLeft(0);
+      setDailySpinClaimed(true);
+      showToast('❌ Aaj ke 3 free spins use ho chuke hain! Kal dobara koshish karein.');
+      return;
     }
+
     const newUsed = usedToday + 1;
+    const remaining = Math.max(0, 3 - newUsed);
     localStorage.setItem('realmoney_spin_date', today);
     localStorage.setItem('realmoney_spins_count', String(newUsed));
-
-    const remaining = Math.max(0, 3 - newUsed);
     setFreeSpinsLeft(remaining);
-    if (remaining <= 0) {
-      setDailySpinClaimed(true);
-    }
+    if (remaining <= 0) setDailySpinClaimed(true);
 
-    setWallet((prev) => ({
-      ...prev,
-      available_balance: Number((prev.available_balance + amount).toFixed(2)),
-      lifetime_earned: Number((prev.lifetime_earned + amount).toFixed(2)),
-    }));
+    // 1. Instantly update wallet state & localStorage (GUARANTEED: NEVER MISS MONEY)
+    let updatedWallet: WalletState;
+    setWallet((prev) => {
+      const curAvail = Number(prev.available_balance || 0);
+      const curEarned = Number(prev.lifetime_earned || 0);
+      const newBal = Number((curAvail + amount).toFixed(2));
+      const newEarned = Number((curEarned + amount).toFixed(2));
+      updatedWallet = {
+        ...prev,
+        id: prev.id || `wal-${user.id}`,
+        user_id: user.id,
+        available_balance: newBal,
+        lifetime_earned: newEarned,
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem('kamaonow_wallet', JSON.stringify(updatedWallet));
+      return updatedWallet;
+    });
 
+    setAllWallets((prev) => {
+      const current = prev[user.id] || wallet;
+      const curAvail = Number(current.available_balance || 0);
+      const curEarned = Number(current.lifetime_earned || 0);
+      const up: WalletState = {
+        ...current,
+        id: current.id || `wal-${user.id}`,
+        user_id: user.id,
+        available_balance: Number((curAvail + amount).toFixed(2)),
+        lifetime_earned: Number((curEarned + amount).toFixed(2)),
+        updated_at: new Date().toISOString(),
+      };
+      const map = { ...prev, [user.id]: up };
+      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(map));
+      return map;
+    });
+
+    // 2. Add to Ledger
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
       user_id: user.id,
@@ -512,38 +841,90 @@ export default function App() {
       description: `Daily Lucky Spin #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
-    setLedger([newEntry, ...ledger]);
+    setLedger((prev) => {
+      const up = [newEntry, ...prev];
+      localStorage.setItem('kamaonow_ledger', JSON.stringify(up));
+      return up;
+    });
+
     if (remaining > 0) {
-      showToast(`+₹${amount.toFixed(2)} credited! Abhi ${remaining}/3 free spins baaki hain. 🎯`);
+      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Abhi ${remaining}/3 spins baaki hain. 🎯`);
     } else {
-      showToast(`+₹${amount.toFixed(2)} credited! Aaj ke sabhi 3 free spins complete ho gaye. 🎉`);
+      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Aaj ke sabhi 3 spins complete ho gaye. 🎉`);
     }
+
+    // 3. Persistent sync to backend & Firestore in background
+    syncUserWallet(user.id, updatedWallet!).catch(console.warn);
+    fetch(`/api/wallet/${user.id}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedWallet!),
+    }).catch(console.warn);
+
+    fetch('/api/spin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, amount }),
+    }).catch(console.warn);
   };
 
-  // Scratch Reward Won (Daily 3 Free Scratch Cards)
-  const handleScratchWon = (amount: number) => {
+  // Scratch Reward Won (Daily 3 Free Scratch Cards — instant credit & cloud synced)
+  const handleScratchWon = async (amount: number) => {
     const today = new Date().toISOString().slice(0, 10);
     const savedDate = localStorage.getItem('realmoney_scratch_date');
-    let usedToday = 0;
-    if (savedDate === today) {
-      usedToday = parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10);
+    let usedToday = savedDate === today ? parseInt(localStorage.getItem('realmoney_scratch_count') || '0', 10) : 0;
+
+    if (usedToday >= 3) {
+      setFreeScratchesLeft(0);
+      setDailyScratchClaimed(true);
+      showToast('❌ Aaj ke 3 scratch cards use ho chuke hain! Kal dobara koshish karein.');
+      return;
     }
+
     const newUsed = usedToday + 1;
+    const remaining = Math.max(0, 3 - newUsed);
     localStorage.setItem('realmoney_scratch_date', today);
     localStorage.setItem('realmoney_scratch_count', String(newUsed));
-
-    const remaining = Math.max(0, 3 - newUsed);
     setFreeScratchesLeft(remaining);
-    if (remaining <= 0) {
-      setDailyScratchClaimed(true);
-    }
+    if (remaining <= 0) setDailyScratchClaimed(true);
 
-    setWallet((prev) => ({
-      ...prev,
-      available_balance: Number((prev.available_balance + amount).toFixed(2)),
-      lifetime_earned: Number((prev.lifetime_earned + amount).toFixed(2)),
-    }));
+    // 1. Instantly update wallet state & localStorage (GUARANTEED: NEVER MISS MONEY)
+    let updatedWallet: WalletState;
+    setWallet((prev) => {
+      const curAvail = Number(prev.available_balance || 0);
+      const curEarned = Number(prev.lifetime_earned || 0);
+      const newBal = Number((curAvail + amount).toFixed(2));
+      const newEarned = Number((curEarned + amount).toFixed(2));
+      updatedWallet = {
+        ...prev,
+        id: prev.id || `wal-${user.id}`,
+        user_id: user.id,
+        available_balance: newBal,
+        lifetime_earned: newEarned,
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem('kamaonow_wallet', JSON.stringify(updatedWallet));
+      return updatedWallet;
+    });
 
+    setAllWallets((prev) => {
+      const current = prev[user.id] || wallet;
+      const curAvail = Number(current.available_balance || 0);
+      const curEarned = Number(current.lifetime_earned || 0);
+      const up: WalletState = {
+        ...current,
+        id: current.id || `wal-${user.id}`,
+        user_id: user.id,
+        available_balance: Number((curAvail + amount).toFixed(2)),
+        lifetime_earned: Number((curEarned + amount).toFixed(2)),
+        updated_at: new Date().toISOString(),
+      };
+      const map = { ...prev, [user.id]: up };
+      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(map));
+      return map;
+    });
+
+    // 2. Add to Ledger
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
       user_id: user.id,
@@ -553,12 +934,31 @@ export default function App() {
       description: `Daily Scratch Card #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     };
-    setLedger([newEntry, ...ledger]);
+    setLedger((prev) => {
+      const up = [newEntry, ...prev];
+      localStorage.setItem('kamaonow_ledger', JSON.stringify(up));
+      return up;
+    });
+
     if (remaining > 0) {
-      showToast(`+₹${amount.toFixed(2)} credited! Abhi ${remaining}/3 scratch cards baaki hain. 🎁`);
+      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Abhi ${remaining}/3 scratch cards baaki hain. 🎁`);
     } else {
-      showToast(`+₹${amount.toFixed(2)} credited! Aaj ke sabhi 3 scratch cards complete ho gaye. 🎉`);
+      showToast(`+₹${amount.toFixed(2)} wallet me add ho gaya! Aaj ke sabhi 3 scratch cards complete ho gaye. 🎉`);
     }
+
+    // 3. Persistent sync to backend & Firestore in background
+    syncUserWallet(user.id, updatedWallet!).catch(console.warn);
+    fetch(`/api/wallet/${user.id}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedWallet!),
+    }).catch(console.warn);
+
+    fetch('/api/scratch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, amount }),
+    }).catch(console.warn);
   };
 
   // Daily Bonus
@@ -568,11 +968,24 @@ export default function App() {
     setDailyBonusClaimed(true);
     localStorage.setItem('kamaonow_daily_date', new Date().toISOString().slice(0, 10));
 
-    setWallet((prev) => ({
-      ...prev,
-      available_balance: Number((prev.available_balance + bonus).toFixed(2)),
-      lifetime_earned: Number((prev.lifetime_earned + bonus).toFixed(2)),
-    }));
+    const newBal = Number((wallet.available_balance + bonus).toFixed(2));
+    const newEarned = Number((wallet.lifetime_earned + bonus).toFixed(2));
+    const updatedWallet: WalletState = {
+      ...wallet,
+      user_id: user.id,
+      available_balance: newBal,
+      lifetime_earned: newEarned,
+      updated_at: new Date().toISOString(),
+    };
+
+    setWallet(updatedWallet);
+    localStorage.setItem('kamaonow_wallet', JSON.stringify(updatedWallet));
+
+    setAllWallets((prev) => {
+      const up = { ...prev, [user.id]: updatedWallet };
+      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
+      return up;
+    });
 
     const newEntry: LedgerItem = {
       id: `led-${Date.now()}`,
@@ -583,8 +996,25 @@ export default function App() {
       description: 'Roz ka Daily Bonus: ₹0.50',
       created_at: new Date().toISOString(),
     };
-    setLedger([newEntry, ...ledger]);
-    showToast('Roz ka Bonus: ₹0.50 credited!');
+    setLedger((prev) => {
+      const up = [newEntry, ...prev];
+      localStorage.setItem('kamaonow_ledger', JSON.stringify(up));
+      return up;
+    });
+
+    showToast('Roz ka Bonus: +₹0.50 wallet me add ho gaya! 🎉');
+
+    syncUserWallet(user.id, updatedWallet).catch(console.warn);
+    fetch(`/api/wallet/${user.id}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedWallet),
+    }).catch(console.warn);
+    fetch('/api/daily-bonus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, amount: bonus }),
+    }).catch(console.warn);
   };
 
   // Withdrawal Request
@@ -693,30 +1123,66 @@ export default function App() {
     const extraFirstTaskBonus = isFirstTaskApproval ? 5 : 0;
     const totalCredit = Number((sub.reward_amount + extraFirstTaskBonus).toFixed(2));
 
+    const updatedSub = {
+      ...sub,
+      status: 'approved' as const,
+      proof_file_id: '', // Proof delete after approval (D1 space bachao)
+      proof_screenshot_url: undefined,
+      admin_note: isFirstTaskApproval
+        ? 'Verified & approved by Admin. +₹5 1st Task Sign-up Bonus credited!'
+        : 'Verified and approved by Admin.',
+      reviewed_at: new Date().toISOString(),
+    };
+
     setSubmissions((prev) =>
-      prev.map((s) =>
-        s.id === subId
-          ? {
-              ...s,
-              status: 'approved',
-              admin_note: isFirstTaskApproval
-                ? 'Verified & approved by Admin. +₹5 1st Task Sign-up Bonus credited!'
-                : 'Verified and approved by Admin.',
-              reviewed_at: new Date().toISOString(),
-            }
-          : s
-      )
+      prev.map((s) => (s.id === subId ? updatedSub : s))
     );
 
-    // If approved submission is for current logged-in user, update their wallet
+    // Calculate updated wallet for target user
+    const targetUserWallet = allWallets[sub.user_id] || (sub.user_id === user.id ? wallet : {
+      id: `wal-${sub.user_id}`,
+      user_id: sub.user_id,
+      available_balance: 0,
+      pending_balance: sub.reward_amount,
+      lifetime_earned: 0,
+      lifetime_withdrawn: 0,
+      updated_at: new Date().toISOString(),
+    });
+
+    const newTargetWallet: WalletState = {
+      ...targetUserWallet,
+      user_id: sub.user_id,
+      pending_balance: Math.max(0, Number((targetUserWallet.pending_balance - sub.reward_amount).toFixed(2))),
+      available_balance: Number((targetUserWallet.available_balance + totalCredit).toFixed(2)),
+      lifetime_earned: Number((targetUserWallet.lifetime_earned + totalCredit).toFixed(2)),
+      updated_at: new Date().toISOString(),
+    };
+
     if (sub.user_id === user.id) {
-      setWallet((prev) => ({
-        ...prev,
-        pending_balance: Math.max(0, Number((prev.pending_balance - sub.reward_amount).toFixed(2))),
-        available_balance: Number((prev.available_balance + totalCredit).toFixed(2)),
-        lifetime_earned: Number((prev.lifetime_earned + totalCredit).toFixed(2)),
-      }));
+      setWallet(newTargetWallet);
+      localStorage.setItem('kamaonow_wallet', JSON.stringify(newTargetWallet));
     }
+
+    setAllWallets((prevMap) => {
+      const up = { ...prevMap, [sub.user_id]: newTargetWallet };
+      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
+      return up;
+    });
+
+    // Cloud & backend persistence for the user who earned the task reward
+    syncUserWallet(sub.user_id, newTargetWallet).catch(console.warn);
+    fetch(`/api/wallet/${sub.user_id}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTargetWallet),
+    }).catch(console.warn);
+
+    syncTaskSubmission(updatedSub).catch(console.warn);
+    fetch(`/api/admin/submissions/${sub.id}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminNote: updatedSub.admin_note }),
+    }).catch(console.warn);
 
     const newEntries: LedgerItem[] = [
       {
@@ -769,14 +1235,45 @@ export default function App() {
           )
         );
 
-        // 2. If current user is the referrer, credit their wallet directly
-        if (effectiveReferrerId === user.id) {
-          setWallet((prev) => ({
-            ...prev,
-            available_balance: Number((prev.available_balance + 5.0).toFixed(2)),
-            lifetime_earned: Number((prev.lifetime_earned + 5.0).toFixed(2)),
-          }));
+        // 2. Update referrer's wallet
+        const rWal = allWallets[effectiveReferrerId] || (effectiveReferrerId === user.id ? wallet : {
+          id: `wal-${effectiveReferrerId}`,
+          user_id: effectiveReferrerId,
+          available_balance: 0,
+          pending_balance: 0,
+          lifetime_earned: 0,
+          lifetime_withdrawn: 0,
+          updated_at: new Date().toISOString(),
+        });
 
+        const newRefWallet: WalletState = {
+          ...rWal,
+          user_id: effectiveReferrerId,
+          available_balance: Number((rWal.available_balance + 5.0).toFixed(2)),
+          lifetime_earned: Number((rWal.lifetime_earned + 5.0).toFixed(2)),
+          updated_at: new Date().toISOString(),
+        };
+
+        if (effectiveReferrerId === user.id) {
+          setWallet(newRefWallet);
+          localStorage.setItem('kamaonow_wallet', JSON.stringify(newRefWallet));
+        }
+
+        setAllWallets((prevMap) => {
+          const up = { ...prevMap, [effectiveReferrerId]: newRefWallet };
+          localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
+          return up;
+        });
+
+        // Cloud sync for referrer wallet
+        syncUserWallet(effectiveReferrerId, newRefWallet).catch(console.warn);
+        fetch(`/api/wallet/${effectiveReferrerId}/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newRefWallet),
+        }).catch(console.warn);
+
+        if (effectiveReferrerId === user.id) {
           setLedger((prev) => [
             {
               id: `led-ref-${Date.now()}`,
@@ -801,28 +1298,6 @@ export default function App() {
           };
           setNotifications((prev) => [refNotif, ...prev]);
         }
-
-        // 3. Update allWallets map for the referrer
-        setAllWallets((prevMap) => {
-          const rWal = prevMap[effectiveReferrerId] || {
-            id: `wal-${effectiveReferrerId}`,
-            user_id: effectiveReferrerId,
-            available_balance: 0,
-            pending_balance: 0,
-            lifetime_earned: 0,
-            lifetime_withdrawn: 0,
-            updated_at: new Date().toISOString(),
-          };
-          return {
-            ...prevMap,
-            [effectiveReferrerId]: {
-              ...rWal,
-              available_balance: Number((rWal.available_balance + 5.0).toFixed(2)),
-              lifetime_earned: Number((rWal.lifetime_earned + 5.0).toFixed(2)),
-              updated_at: new Date().toISOString(),
-            },
-          };
-        });
       }
 
       if (sub.user_id === user.id) {
@@ -850,18 +1325,60 @@ export default function App() {
     const sub = submissions.find((s) => s.id === subId);
     if (!sub || sub.status !== 'pending') return;
 
+    const rejectedSub = {
+      ...sub,
+      status: 'rejected' as const,
+      proof_file_id: '',
+      proof_screenshot_url: undefined,
+      admin_note: note,
+      reviewed_at: new Date().toISOString(),
+    };
+
     setSubmissions((prev) =>
-      prev.map((s) =>
-        s.id === subId
-          ? { ...s, status: 'rejected', admin_note: note, reviewed_at: new Date().toISOString() }
-          : s
-      )
+      prev.map((s) => (s.id === subId ? rejectedSub : s))
     );
 
-    setWallet((prev) => ({
-      ...prev,
-      pending_balance: Math.max(0, Number((prev.pending_balance - sub.reward_amount).toFixed(2))),
-    }));
+    const targetUserWallet = allWallets[sub.user_id] || (sub.user_id === user.id ? wallet : {
+      id: `wal-${sub.user_id}`,
+      user_id: sub.user_id,
+      available_balance: 0,
+      pending_balance: sub.reward_amount,
+      lifetime_earned: 0,
+      lifetime_withdrawn: 0,
+      updated_at: new Date().toISOString(),
+    });
+
+    const newTargetWallet: WalletState = {
+      ...targetUserWallet,
+      user_id: sub.user_id,
+      pending_balance: Math.max(0, Number((targetUserWallet.pending_balance - sub.reward_amount).toFixed(2))),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (sub.user_id === user.id) {
+      setWallet(newTargetWallet);
+      localStorage.setItem('kamaonow_wallet', JSON.stringify(newTargetWallet));
+    }
+
+    setAllWallets((prevMap) => {
+      const up = { ...prevMap, [sub.user_id]: newTargetWallet };
+      localStorage.setItem('kamaonow_all_wallets', JSON.stringify(up));
+      return up;
+    });
+
+    syncUserWallet(sub.user_id, newTargetWallet).catch(console.warn);
+    fetch(`/api/wallet/${sub.user_id}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTargetWallet),
+    }).catch(console.warn);
+
+    syncTaskSubmission(rejectedSub).catch(console.warn);
+    fetch(`/api/admin/submissions/${sub.id}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: note }),
+    }).catch(console.warn);
 
     showToast('Submission marked rejected.');
   };
@@ -1154,10 +1671,13 @@ export default function App() {
     showToast('Reset to original Real Money App state.');
   };
 
-  const handleLoginSuccess = (loggedInUser: UserProfile, isNewUser: boolean) => {
+  const handleLoginSuccess = async (loggedInUser: UserProfile, isNewUser: boolean) => {
     setUser(loggedInUser);
     localStorage.setItem('kamaonow_user', JSON.stringify(loggedInUser));
     setIsLoggedIn(true);
+    // Login ke baad user wahi page pe jayega jahan se aaya tha (Google se /spin → spin screen)
+    const targetTab = pendingTab !== 'home' ? pendingTab : 'home';
+    navigateTo(targetTab);
 
     setAllUsers((prev) => {
       const exists = prev.some((u) => u.id === loggedInUser.id);
@@ -1167,7 +1687,14 @@ export default function App() {
       return [loggedInUser, ...prev];
     });
 
-    if (isNewUser) {
+    // Check if user already has an existing wallet on backend API or Firestore
+    const restored = await restoreUserWallet(loggedInUser.id);
+    if (restored && (restored.available_balance > 0 || restored.lifetime_earned > 0 || restored.pending_balance > 0)) {
+      showToast(`Welcome back, ${loggedInUser.name || 'User'}! Aapka balance ₹${restored.available_balance.toFixed(2)} restore ho gaya hai. 💰`);
+      return;
+    }
+
+    if (!restored) {
       // RULE: Sign-up bonus (₹5) is credited ONLY when 1st task is completed!
       const freshWallet: WalletState = {
         id: `wal-${loggedInUser.id}`,
@@ -1180,6 +1707,14 @@ export default function App() {
       };
       setWallet(freshWallet);
       setAllWallets((prev) => ({ ...prev, [loggedInUser.id]: freshWallet }));
+      localStorage.setItem('kamaonow_wallet', JSON.stringify(freshWallet));
+
+      syncUserWallet(loggedInUser.id, freshWallet).catch(console.warn);
+      fetch(`/api/wallet/${loggedInUser.id}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(freshWallet),
+      }).catch(console.warn);
 
       // If referred by someone, record pending referral item (₹5 credited when this user does 1st task)
       if (loggedInUser.referred_by) {
@@ -1272,7 +1807,7 @@ export default function App() {
           {/* Left Slot: 3D Logo or Back Button if inside a subscreen */}
           {activeTab === 'home' ? (
             <div
-              onClick={() => setActiveTab('home')}
+              onClick={() => navigateTo('home')}
               className="flex items-center gap-2 cursor-pointer select-none"
             >
               <KamaoNowLogo3D size={34} />
@@ -1290,7 +1825,7 @@ export default function App() {
           ) : (
             <button
               type="button"
-              onClick={() => setActiveTab('home')}
+              onClick={() => navigateTo('home')}
               className="flex items-center gap-2 text-white font-black text-sm hover:text-emerald-200 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5 text-white" />
@@ -1411,7 +1946,7 @@ export default function App() {
             </div>
 
             {/* 4. PROMO CAROUSEL BANNER (Invite Friends, Spin & Win, Scratch & Win) */}
-            <HomeBannerSlider onNavigate={(tab) => setActiveTab(tab)} />
+            <HomeBannerSlider onNavigate={(tab) => navigateTo(tab as NavTab)} />
 
             {/* 5. QUICK ACTIONS GRID (Compact Boxes & Crystal-Clear Visual Icons) */}
             <div>
@@ -1422,7 +1957,7 @@ export default function App() {
                 {/* 1. Tasks */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('tasks')}
+                  onClick={() => navigateTo('tasks')}
                   className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group"
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#00C853] to-[#009624] text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(0,200,83,0.3)] group-hover:scale-105 transition-transform">
@@ -1440,7 +1975,7 @@ export default function App() {
                 {/* 2. Spin & Win */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('spin')}
+                  onClick={() => navigateTo('spin')}
                   className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group"
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#A855F7] to-[#7E22CE] text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(168,85,247,0.3)] group-hover:scale-105 transition-transform">
@@ -1462,7 +1997,7 @@ export default function App() {
                 {/* 3. Scratch Card */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('scratch')}
+                  onClick={() => navigateTo('scratch')}
                   className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group"
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#F43F5E] to-[#BE123C] text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(244,63,94,0.3)] group-hover:scale-105 transition-transform">
@@ -1482,7 +2017,7 @@ export default function App() {
                 {/* 4. Refer & Earn */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('refer')}
+                  onClick={() => navigateTo('refer')}
                   className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-emerald-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group relative overflow-hidden"
                 >
                   <span className="absolute top-1 right-1 px-1.5 py-0.2 rounded-full bg-amber-400 text-amber-950 text-[9px] font-black leading-tight shadow-xs">
@@ -1498,7 +2033,7 @@ export default function App() {
                 {/* 5. Daily Bonus */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('daily')}
+                  onClick={() => navigateTo('daily')}
                   className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group"
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#FB923C] to-[#EA580C] text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(249,115,22,0.3)] group-hover:scale-105 transition-transform">
@@ -1517,7 +2052,7 @@ export default function App() {
                 {/* 6. Profile */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab('profile')}
+                  onClick={() => navigateTo('profile')}
                   className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0.5 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center group"
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#38BDF8] to-[#0284C7] text-white flex items-center justify-center mb-1 shadow-[0_3px_8px_rgba(2,132,199,0.3)] group-hover:scale-105 transition-transform">
@@ -1535,7 +2070,7 @@ export default function App() {
 
             {/* DEDICATED REFER & EARN BANNER CARD */}
             <div
-              onClick={() => setActiveTab('refer')}
+              onClick={() => navigateTo('refer')}
               className="p-3.5 rounded-2xl bg-gradient-to-r from-[#065F46] via-[#047857] to-[#059669] border border-emerald-400/30 text-white flex items-center justify-between shadow-md cursor-pointer hover:shadow-lg transition-all active:scale-[0.99]"
             >
               <div className="flex items-center gap-3">
@@ -1563,7 +2098,7 @@ export default function App() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('tasks')}
+                  onClick={() => navigateTo('tasks')}
                   className="text-xs font-bold text-emerald-600 hover:text-emerald-700 cursor-pointer"
                 >
                   See All ({tasks.length}) &gt;
@@ -1781,7 +2316,7 @@ export default function App() {
               totalDailySpins={3}
               dailyClaimed={dailySpinClaimed || freeSpinsLeft <= 0}
               onRewardWon={handleSpinWon}
-              onBack={() => setActiveTab('home')}
+              onBack={() => navigateTo('home')}
               onOpenRules={() => setShowRulesModal(true)}
               onOpenNotifications={() => setShowNotificationModal(true)}
               unreadNotificationsCount={unreadCount}
@@ -1799,7 +2334,7 @@ export default function App() {
               totalDailyScratches={3}
               dailyClaimed={dailyScratchClaimed || freeScratchesLeft <= 0}
               onRewardWon={handleScratchWon}
-              onBack={() => setActiveTab('home')}
+              onBack={() => navigateTo('home')}
               onOpenRules={() => setShowRulesModal(true)}
               onOpenNotifications={() => setShowNotificationModal(true)}
               unreadNotificationsCount={unreadCount}
@@ -2035,13 +2570,27 @@ export default function App() {
             {/* User Profile Card -> CRISP WHITE */}
             <div className="p-5 rounded-3xl bg-white border border-slate-100 flex items-center justify-between gap-4 shadow-md text-slate-900">
               <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-100 shrink-0 shadow-sm">
-                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-emerald-500 bg-emerald-50 shrink-0 shadow-sm flex items-center justify-center">
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xl font-black text-emerald-700">
+                      {(user.name || 'U').charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </div>
                 <div>
-                  <h2 className="text-base font-black text-slate-900">{user.name}</h2>
-                  <p className="text-xs text-emerald-700 font-mono font-bold">{user.email}</p>
-                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">+91 {user.phone}</p>
+                  <h2 className="text-base font-black text-slate-900">{user.name || 'User'}</h2>
+                  {user.email && !user.email.endsWith('@realmoneyapp.online') ? (
+                    <p className="text-xs text-emerald-700 font-mono font-bold">{user.email}</p>
+                  ) : (
+                    <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Mobile Verified
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                    {user.phone ? (user.phone.startsWith('+91') ? user.phone : `+91 ${user.phone}`) : 'No phone linked'}
+                  </p>
                 </div>
               </div>
 
@@ -2049,7 +2598,17 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   const newName = prompt('Enter your name:', user.name);
-                  if (newName) setUser({ ...user, name: newName });
+                  if (newName && newName.trim()) {
+                    const upUser = { ...user, name: newName.trim() };
+                    setUser(upUser);
+                    localStorage.setItem('kamaonow_user', JSON.stringify(upUser));
+                    syncUserProfile(upUser).catch(console.warn);
+                    fetch('/api/user/sync', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(upUser),
+                    }).catch(console.warn);
+                  }
                 }}
                 className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shrink-0 cursor-pointer shadow-sm transition-colors"
               >
@@ -2061,19 +2620,19 @@ export default function App() {
             <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-emerald-600 text-lg">
-                  {submissions.filter((s) => s.status === 'approved').length + 11}
+                  {submissions.filter((s) => s.user_id === user.id && s.status === 'approved').length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Completed Tasks</div>
               </div>
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-amber-500 text-lg">
-                  {referrals.length + 2}
+                  {referrals.filter((r) => r.referrer_id === user.id || r.referrer_id === user.referral_code).length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Referrals</div>
               </div>
               <div className="p-3 rounded-2xl bg-white border border-slate-100 shadow-xs">
                 <div className="font-mono font-black text-teal-600 text-lg">
-                  {withdrawals.filter((w) => w.status === 'approved').length + 1}
+                  {withdrawals.filter((w) => w.user_id === user.id && w.status === 'approved').length}
                 </div>
                 <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">Withdrawals</div>
               </div>
@@ -2110,7 +2669,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('refer')}
+                onClick={() => navigateTo('refer')}
                 className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left"
               >
                 <div className="flex items-center gap-3">
@@ -2122,12 +2681,12 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('tasks')}
+                onClick={() => navigateTo('tasks')}
                 className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left"
               >
                 <div className="flex items-center gap-3">
                   <CheckSquare className="w-4 h-4 text-emerald-600" />
-                  <span className="font-bold text-slate-900">Task History ({submissions.length})</span>
+                  <span className="font-bold text-slate-900">Task History ({submissions.filter((s) => s.user_id === user.id).length})</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
@@ -2139,14 +2698,14 @@ export default function App() {
               >
                 <div className="flex items-center gap-3">
                   <History className="w-4 h-4 text-emerald-600" />
-                  <span className="font-bold text-slate-900">Withdrawal History ({withdrawals.length})</span>
+                  <span className="font-bold text-slate-900">Withdrawal History ({withdrawals.filter((w) => w.user_id === user.id).length})</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
 
               <button
                 type="button"
-                onClick={() => setActiveTab('spin')}
+                onClick={() => navigateTo('spin')}
                 className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left"
               >
                 <div className="flex items-center gap-3">
@@ -2158,7 +2717,7 @@ export default function App() {
 
               <button
                 type="button"
-                onClick={() => setActiveTab('scratch')}
+                onClick={() => navigateTo('scratch')}
                 className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left"
               >
                 <div className="flex items-center gap-3">
@@ -2198,7 +2757,7 @@ export default function App() {
                   >
                     <div className="flex items-center gap-3">
                       <RotateCcw className="w-4 h-4 text-slate-500" />
-                      <span className="font-bold text-slate-700">Reset Demo Data (Admin Only)</span>
+                      <span className="font-bold text-slate-700">Clear Local Cache &amp; Reset (Admin Only)</span>
                     </div>
                     <span className="text-[11px] text-slate-400 font-mono">Clean State</span>
                   </button>
@@ -2230,7 +2789,7 @@ export default function App() {
         {/* 1. Home */}
         <button
           type="button"
-          onClick={() => setActiveTab('home')}
+          onClick={() => navigateTo('home')}
           className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all ${
             activeTab === 'home'
               ? 'text-emerald-600 font-black scale-105'
@@ -2244,7 +2803,7 @@ export default function App() {
         {/* 2. Tasks */}
         <button
           type="button"
-          onClick={() => setActiveTab('tasks')}
+          onClick={() => navigateTo('tasks')}
           className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all ${
             activeTab === 'tasks'
               ? 'text-emerald-600 font-black scale-105'
@@ -2258,7 +2817,7 @@ export default function App() {
         {/* 3. Spin */}
         <button
           type="button"
-          onClick={() => setActiveTab('spin')}
+          onClick={() => navigateTo('spin')}
           className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all ${
             activeTab === 'spin'
               ? 'text-emerald-600 font-black scale-105'
@@ -2272,7 +2831,7 @@ export default function App() {
         {/* 4. Scratch */}
         <button
           type="button"
-          onClick={() => setActiveTab('scratch')}
+          onClick={() => navigateTo('scratch')}
           className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all ${
             activeTab === 'scratch'
               ? 'text-emerald-600 font-black scale-105'
@@ -2286,7 +2845,7 @@ export default function App() {
         {/* 5. Refer */}
         <button
           type="button"
-          onClick={() => setActiveTab('refer')}
+          onClick={() => navigateTo('refer')}
           className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all relative ${
             activeTab === 'refer'
               ? 'text-emerald-600 font-black scale-105'
@@ -2303,7 +2862,7 @@ export default function App() {
         {/* 6. Profile */}
         <button
           type="button"
-          onClick={() => setActiveTab('profile')}
+          onClick={() => navigateTo('profile')}
           className={`flex flex-col items-center justify-center p-1 cursor-pointer transition-all ${
             activeTab === 'profile'
               ? 'text-emerald-600 font-black scale-105'
@@ -2362,7 +2921,7 @@ export default function App() {
             setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
             showToast('Sabhi notifications mark as read ho gayi.');
           }}
-          onNavigateTab={(tab) => setActiveTab(tab as NavTab)}
+          onNavigateTab={(tab) => navigateTo(tab as NavTab)}
           showToast={showToast}
         />
       )}

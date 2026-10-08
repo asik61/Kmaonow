@@ -1,16 +1,16 @@
 {
   "users": [
     {
-      "id": "usr-demo-001",
-      "name": "Rahul Sharma",
-      "phone": "+91 98765 43210",
-      "email": "rahul.earner@gmail.com",
-      "referral_code": "KAMAO2026",
+      "id": "usr-6202636470",
+      "name": "Asik Khan",
+      "phone": "+91 62026 36470",
+      "email": "asik94906@gmail.com",
+      "referral_code": "REALHQ",
       "referred_by": null,
       "is_blocked": false,
       "is_verified": true,
-      "role": "user",
-      "created_at": "2026-09-20T10:00:00Z"
+      "role": "admin",
+      "created_at": "2026-10-01T10:00:00Z"
     }
   ],
   "tasks": [
@@ -76,99 +76,38 @@
       "created_at": "2026-09-30T08:00:00Z"
     }
   ],
-  "task_submissions": [
-    {
-      "id": "sub-1",
-      "user_id": "usr-demo-001",
-      "user_name": "Rahul Sharma",
-      "user_phone": "+91 98765 43210",
-      "task_id": "task-1",
-      "task_title": "Zupee App Download",
-      "reward_amount": 15,
-      "proof_file_id": "https://images.unsplash.com/photo-1555421689-d68471e189f2?w=500&auto=format&fit=crop&q=60",
-      "status": "approved",
-      "admin_note": "Verified gameplay proof. Reward credited.",
-      "submitted_at": "2026-09-28T14:30:00Z",
-      "reviewed_at": "2026-09-28T15:00:00Z"
-    },
-    {
-      "id": "sub-2",
-      "user_id": "usr-demo-001",
-      "user_name": "Rahul Sharma",
-      "user_phone": "+91 98765 43210",
-      "task_id": "task-2",
-      "task_title": "Navi Mutual Fund KYC",
-      "reward_amount": 50,
-      "proof_file_id": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&auto=format&fit=crop&q=60",
-      "status": "pending",
-      "admin_note": "Verification in progress by manual auditor.",
-      "submitted_at": "2026-09-30T16:20:00Z"
-    }
-  ],
+  "task_submissions": [],
   "wallets": [
     {
-      "id": "wal-1",
-      "user_id": "usr-demo-001",
-      "available_balance": 18.5,
-      "pending_balance": 6.25,
-      "lifetime_earned": 24.75,
+      "id": "wal-1791428940191",
+      "user_id": "usr-6202636470",
+      "available_balance": 0.5,
+      "pending_balance": 0,
+      "lifetime_earned": 0.5,
       "lifetime_withdrawn": 0,
-      "updated_at": "2026-10-02T10:39:22.678Z"
+      "updated_at": "2026-10-08T03:09:04.496Z"
     }
   ],
   "ledger": [
     {
-      "id": "led-1",
-      "user_id": "usr-demo-001",
-      "type": "task_reward",
-      "amount": 15,
-      "status": "credit",
-      "reference_id": "task-1",
-      "description": "Task Approved: Zupee App Download",
-      "created_at": "2026-09-28T15:00:00Z"
-    },
-    {
-      "id": "led-2",
-      "user_id": "usr-demo-001",
-      "type": "referral_bonus",
-      "amount": 3,
-      "status": "credit",
-      "reference_id": "ref-1",
-      "description": "Referral Bonus: Amit Patel joined & qualified",
-      "created_at": "2026-09-29T18:30:00Z"
-    },
-    {
-      "id": "led-3",
-      "user_id": "usr-demo-001",
-      "type": "daily_bonus",
+      "id": "led-1791428944496",
+      "user_id": "usr-6202636470",
+      "type": "spin_reward",
       "amount": 0.5,
       "status": "credit",
-      "description": "Daily Check-in Bonus",
-      "created_at": "2026-09-30T09:00:00Z"
+      "description": "Daily Lucky Spin #1 Reward: ₹0.50",
+      "created_at": "2026-10-08T03:09:04.496Z"
     }
   ],
-  "referrals": [
+  "referrals": [],
+  "spin_history": [
     {
-      "id": "ref-1",
-      "referrer_id": "usr-demo-001",
-      "referred_user_id": "usr-2",
-      "referred_user_name": "Amit Patel",
-      "status": "qualified",
-      "reward_amount": 3,
-      "qualified_at": "2026-09-29T18:30:00Z",
-      "created_at": "2026-09-29T12:00:00Z"
-    },
-    {
-      "id": "ref-2",
-      "referrer_id": "usr-demo-001",
-      "referred_user_id": "usr-3",
-      "referred_user_name": "Suresh Verma",
-      "status": "pending",
-      "reward_amount": 3,
-      "created_at": "2026-09-30T14:15:00Z"
+      "id": "spin-1791428944495",
+      "user_id": "usr-6202636470",
+      "reward_amount": 0.5,
+      "created_at": "2026-10-08T03:09:04.495Z"
     }
   ],
-  "spin_history": [],
   "scratch_history": [],
   "withdrawals": [],
   "daily_bonus": [],

@@ -364,54 +364,100 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     }
 
     setLoading(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setLoading(false);
       const userEmail = googleUser ? googleUser.email.trim().toLowerCase() : `${cleanPhone}@realmoneyapp.online`;
       const isMasterAdmin = userEmail === 'asik94906@gmail.com' || cleanPhone === '6202636470';
 
       const userCode = `RM${cleanPhone.slice(-4)}${Math.floor(100 + Math.random() * 900)}`;
-      const finalUser: UserProfile = {
-        id: `usr-${cleanPhone}`,
-        name: (name || googleUser?.name || `User ${cleanPhone.slice(-4)}`).trim(),
-        phone: `+91 ${cleanPhone}`,
-        email: userEmail,
-        referral_code: userCode,
-        referred_by: referralCode.trim() ? referralCode.trim().toUpperCase() : null,
-        is_blocked: false,
-        is_verified: true,
-        role: isMasterAdmin ? 'admin' : 'user',
-        avatar_url:
-          googleUser?.avatar ||
-          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-        created_at: new Date().toISOString(),
-      };
+
+      // Check if user already exists in local, Firestore, or Server API
+      let existing = findExistingUserLocal(cleanPhone, userEmail);
+      if (!existing) {
+        try {
+          existing = (await findUserByPhone(cleanPhone)) || (await findUserByEmail(userEmail));
+        } catch {
+          // fallback
+        }
+      }
+      if (!existing) {
+        try {
+          const res = await fetch(`/api/user/by-phone/${cleanPhone}`);
+          const sUser = (await res.json()) as any;
+          if (sUser && sUser.id && !sUser.error) {
+            existing = sUser;
+          }
+        } catch {
+          // fallback
+        }
+      }
+
+      const isReturningUser = !!existing;
+      const finalUser: UserProfile = existing
+        ? {
+            ...existing,
+            name: existing.name || (name || googleUser?.name || `User ${cleanPhone.slice(-4)}`).trim(),
+            email: userEmail || existing.email,
+            avatar_url: googleUser?.avatar || existing.avatar_url,
+          }
+        : {
+            id: `usr-${cleanPhone}`,
+            name: (name || googleUser?.name || `User ${cleanPhone.slice(-4)}`).trim(),
+            phone: `+91 ${cleanPhone}`,
+            email: userEmail,
+            referral_code: userCode,
+            referred_by: referralCode.trim() ? referralCode.trim().toUpperCase() : null,
+            is_blocked: false,
+            is_verified: true,
+            role: isMasterAdmin ? 'admin' : 'user',
+            avatar_url:
+              googleUser?.avatar ||
+              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+            created_at: new Date().toISOString(),
+          };
 
       // Lock device to this account
       registerAccountOnDevice(cleanPhone, userEmail, finalUser.name);
       syncUserProfile(finalUser).catch(console.error);
+      fetch('/api/user/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalUser),
+      }).catch(console.warn);
 
-      setCreatedProfile({ user: finalUser, isNew: true });
-      setStage('success-bonus');
+      if (isReturningUser) {
+        // Returning user - direct login, keeps wallet safe!
+        onLoginSuccess(finalUser, false);
+      } else {
+        setCreatedProfile({ user: finalUser, isNew: true });
+        setStage('success-bonus');
+      }
     }, 450);
   };
 
-  // Quick Demo Bypass for Master Admin testing
+  // Quick Admin Bypass for Master Admin testing
   const handleQuickDemo = () => {
-    const demoUser: UserProfile = {
-      id: 'usr-asik-01',
+    const adminUser: UserProfile = {
+      id: 'usr-6202636470',
       name: 'Asik Khan (Master Admin)',
       phone: '+91 62026 36470',
       email: 'asik94906@gmail.com',
       avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-      referral_code: 'REAL99',
+      referral_code: 'REALHQ',
       referred_by: null,
       is_blocked: false,
       is_verified: true,
       role: 'admin',
       created_at: '2026-09-01T00:00:00Z',
     };
-    registerAccountOnDevice('6202636470', 'asik94906@gmail.com', demoUser.name);
-    onLoginSuccess(demoUser, false);
+    registerAccountOnDevice('6202636470', 'asik94906@gmail.com', adminUser.name);
+    syncUserProfile(adminUser).catch(console.warn);
+    fetch('/api/user/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(adminUser),
+    }).catch(console.warn);
+    onLoginSuccess(adminUser, false);
   };
 
   // Resend timer effect
@@ -949,7 +995,7 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
 
             <button
               type="button"
-              onClick={() => onLoginSuccess(createdProfile.user, true)}
+              onClick={() => onLoginSuccess(createdProfile.user, createdProfile.isNew)}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-sm shadow-xl hover:shadow-emerald-500/30 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
             >
               <span>🚀 Start Earning Real Cash</span>

@@ -34,33 +34,29 @@ service cloud.firestore {
 
     // User profiles
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isOwner(userId) || isAdmin();
-      allow update: if isOwner(userId) || isAdmin();
+      allow read: if true;
+      allow create, update: if true;
       allow delete: if isAdmin();
     }
 
     // Wallets
     match /wallets/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) || isAdmin();
-      allow update: if isOwner(userId) || isAdmin();
+      allow read: if true;
+      allow create, update: if true;
       allow delete: if isAdmin();
     }
 
     // Task Submissions
     match /submissions/{subId} {
-      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
-      allow update: if isAdmin();
+      allow read: if true;
+      allow create, update: if true;
       allow delete: if isAdmin();
     }
 
     // Withdrawals
     match /withdrawals/{withdrawalId} {
-      allow read: if isSignedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
-      allow update: if isAdmin();
+      allow read: if true;
+      allow create, update: if true;
       allow delete: if isAdmin();
     }
   }

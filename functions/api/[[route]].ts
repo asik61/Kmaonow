@@ -90,6 +90,56 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
+  // 1b. USER LOOKUP & SYNC
+  if (pathname.startsWith('/api/user/by-phone/') && method === 'GET') {
+    const rawPhone = pathname.split('/').pop() || '';
+    const cleanPhone = rawPhone.replace(/\D/g, '');
+    try {
+      const user = await env.DB.prepare(
+        'SELECT * FROM users WHERE replace(replace(phone, " ", ""), "+91", "") LIKE ?'
+      )
+        .bind(`%${cleanPhone}%`)
+        .first();
+      return json(user || { ok: false, error: 'User not found' });
+    } catch (e: any) {
+      return json({ error: e.message }, 500);
+    }
+  }
+
+  if (pathname === '/api/user/sync' && method === 'POST') {
+    try {
+      const u: any = await request.json();
+      const cleanPhone = (u.phone || '').replace(/\D/g, '');
+      const userId = u.id || `usr-${cleanPhone || Date.now()}`;
+      await env.DB.prepare(
+        `INSERT INTO users (id, name, phone, email, referral_code, referred_by, is_blocked, is_verified, role, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           phone = excluded.phone,
+           email = excluded.email,
+           role = excluded.role,
+           is_verified = excluded.is_verified`
+      )
+        .bind(
+          userId,
+          u.name || 'User',
+          u.phone || '',
+          u.email || '',
+          u.referral_code || `RM${cleanPhone.slice(-4)}`,
+          u.referred_by || null,
+          u.is_blocked ? 1 : 0,
+          u.is_verified ? 1 : 0,
+          u.role || 'user',
+          u.created_at || new Date().toISOString()
+        )
+        .run();
+      return json({ ok: true, user: { ...u, id: userId } });
+    } catch (e: any) {
+      return json({ ok: false, error: e.message }, 500);
+    }
+  }
+
   // 2. GET ACTIVE TASKS
   if (pathname === '/api/tasks' && method === 'GET') {
     try {
@@ -126,6 +176,36 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return json(wallet);
     } catch (e: any) {
       return json({ error: e.message }, 500);
+    }
+  }
+
+  // 3b. SYNC WALLET FOR USER
+  if (pathname.startsWith('/api/wallet/') && pathname.endsWith('/sync') && method === 'POST') {
+    const parts = pathname.split('/');
+    const userId = parts[parts.length - 2] || 'usr-demo-001';
+    try {
+      const w: any = await request.json();
+      const avail = Number(w.available_balance ?? w.balance ?? 0);
+      const pend = Number(w.pending_balance ?? 0);
+      const earned = Number(w.lifetime_earned ?? 0);
+      const withdrawn = Number(w.lifetime_withdrawn ?? 0);
+
+      await env.DB.prepare(
+        `INSERT INTO wallets (id, user_id, available_balance, pending_balance, lifetime_earned, lifetime_withdrawn, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(user_id) DO UPDATE SET
+           available_balance = CASE WHEN excluded.available_balance = 0 AND wallets.available_balance > 0 THEN wallets.available_balance ELSE excluded.available_balance END,
+           pending_balance = MAX(wallets.pending_balance, excluded.pending_balance),
+           lifetime_earned = MAX(wallets.lifetime_earned, excluded.lifetime_earned, excluded.available_balance),
+           lifetime_withdrawn = MAX(wallets.lifetime_withdrawn, excluded.lifetime_withdrawn),
+           updated_at = CURRENT_TIMESTAMP`
+      )
+        .bind(`wal-${userId}`, userId, avail, pend, earned, withdrawn)
+        .run();
+
+      return json({ ok: true, wallet: { user_id: userId, available_balance: avail, pending_balance: pend, lifetime_earned: earned, lifetime_withdrawn: withdrawn } });
+    } catch (e: any) {
+      return json({ ok: false, error: e.message }, 500);
     }
   }
 
@@ -197,12 +277,43 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // 6. RECORD SPIN REWARD
+  // 5b. GET USER SUBMISSIONS
+  if (pathname.startsWith('/api/submissions/user/') && method === 'GET') {
+    const userId = pathname.split('/').pop() || 'usr-demo-001';
+    try {
+      const res = await env.DB.prepare(
+        'SELECT * FROM task_submissions WHERE user_id = ? ORDER BY submitted_at DESC'
+      )
+        .bind(userId)
+        .all();
+      return json(res.results || []);
+    } catch (e: any) {
+      return json({ error: e.message }, 500);
+    }
+  }
+
+  // 6. RECORD SPIN REWARD (D1 server-side daily 3 limit check)
   if (pathname === '/api/spin' && method === 'POST') {
     try {
       const body: any = await request.json();
       const userId = body.userId || 'usr-demo-001';
       const amount = Number(body.amount);
+      const DAILY_SPIN_LIMIT = 3;
+
+      // D1 se aaj ke spins count karo (Indian timezone: UTC+5:30)
+      const todayIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const countRow: any = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM spin_history WHERE user_id = ? AND date(created_at, '+5 hours 30 minutes') = ?"
+      )
+        .bind(userId, todayIST)
+        .first();
+
+      const usedToday = countRow?.cnt ?? 0;
+      if (usedToday >= DAILY_SPIN_LIMIT) {
+        return json({ ok: false, error: `Aaj ke ${DAILY_SPIN_LIMIT} free spins complete ho gaye. Kal wapas aao!`, limitReached: true }, 429);
+      }
+
+      const remaining = DAILY_SPIN_LIMIT - usedToday - 1;
 
       await env.DB.prepare(
         'INSERT INTO spin_history (id, user_id, reward_amount) VALUES (?, ?, ?)'
@@ -222,18 +333,34 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         .bind(`led-${Date.now()}`, userId, amount, `Fortune Spin Win: ₹${amount.toFixed(2)}`)
         .run();
 
-      return json({ ok: true });
+      return json({ ok: true, remaining, usedToday: usedToday + 1, dailyLimit: DAILY_SPIN_LIMIT });
     } catch (e: any) {
       return json({ ok: false, error: e.message }, 500);
     }
   }
 
-  // 7. RECORD SCRATCH REWARD
+  // 7. RECORD SCRATCH REWARD (D1 server-side daily 3 limit check)
   if (pathname === '/api/scratch' && method === 'POST') {
     try {
       const body: any = await request.json();
       const userId = body.userId || 'usr-demo-001';
       const amount = Number(body.amount);
+      const DAILY_SCRATCH_LIMIT = 3;
+
+      // D1 se aaj ke scratches count karo (Indian timezone: UTC+5:30)
+      const todayIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const countRow: any = await env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM scratch_history WHERE user_id = ? AND date(created_at, '+5 hours 30 minutes') = ?"
+      )
+        .bind(userId, todayIST)
+        .first();
+
+      const usedToday = countRow?.cnt ?? 0;
+      if (usedToday >= DAILY_SCRATCH_LIMIT) {
+        return json({ ok: false, error: `Aaj ke ${DAILY_SCRATCH_LIMIT} free scratch cards complete ho gaye. Kal wapas aao!`, limitReached: true }, 429);
+      }
+
+      const remaining = DAILY_SCRATCH_LIMIT - usedToday - 1;
 
       await env.DB.prepare(
         'INSERT INTO scratch_history (id, user_id, reward_amount) VALUES (?, ?, ?)'
@@ -253,7 +380,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         .bind(`led-${Date.now()}`, userId, amount, `Scratch Card Win: ₹${amount.toFixed(2)}`)
         .run();
 
-      return json({ ok: true });
+      return json({ ok: true, remaining, usedToday: usedToday + 1, dailyLimit: DAILY_SCRATCH_LIMIT });
     } catch (e: any) {
       return json({ ok: false, error: e.message }, 500);
     }

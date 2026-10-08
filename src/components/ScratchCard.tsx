@@ -309,6 +309,10 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
         ctx.clearRect(0, 0, cv.width, cv.height);
         playWinJingle();
         setShowResultModal(true);
+        if (!hasClaimedCurrent) {
+          setHasClaimedCurrent(true);
+          onRewardWon(currentPrize.value);
+        }
       }
     } catch {
       // fallback
@@ -351,13 +355,13 @@ export const ScratchCard: React.FC<ScratchCardProps> = ({
     setScratchedPct(100);
     playWinJingle();
     setShowResultModal(true);
-  };
-
-  const handleClaim = () => {
     if (!hasClaimedCurrent) {
       setHasClaimedCurrent(true);
       onRewardWon(currentPrize.value);
     }
+  };
+
+  const handleClaim = () => {
     setShowResultModal(false);
     // Pick next random prize for the next scratch card
     setCurrentPrize(PRIZES[Math.floor(Math.random() * PRIZES.length)]);

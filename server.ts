@@ -39,6 +39,20 @@ async function startServer() {
     res.json(user);
   });
 
+  app.get('/api/user/by-phone/:phone', (req, res) => {
+    const user = db.getUserByPhone(req.params.phone);
+    res.json(user || { ok: false, error: 'User not found' });
+  });
+
+  app.post('/api/user/sync', (req, res) => {
+    try {
+      const saved = db.saveUser(req.body);
+      res.json({ ok: true, user: saved });
+    } catch (e: any) {
+      res.status(400).json({ ok: false, error: e.message });
+    }
+  });
+
   // 2. Tasks
   app.get('/api/tasks', (_req, res) => {
     res.json(db.getTasks());
@@ -74,6 +88,12 @@ async function startServer() {
     res.json(snapshot.task_submissions);
   });
 
+  app.get('/api/submissions/user/:userId', (req, res) => {
+    const snapshot = db.getSnapshot();
+    const subs = snapshot.task_submissions.filter((s) => s.user_id === req.params.userId);
+    res.json(subs);
+  });
+
   app.post('/api/admin/submissions/:id/approve', (req, res) => {
     const approved = db.approveSubmission(req.params.id, req.body.adminNote);
     if (!approved) return res.status(404).json({ ok: false, error: 'Submission not found or already reviewed' });
@@ -90,6 +110,15 @@ async function startServer() {
   app.get('/api/wallet/:userId', (req, res) => {
     const wallet = db.getWallet(req.params.userId);
     res.json(wallet);
+  });
+
+  app.post('/api/wallet/:userId/sync', (req, res) => {
+    try {
+      const synced = db.syncWallet(req.params.userId, req.body);
+      res.json({ ok: true, wallet: synced });
+    } catch (e: any) {
+      res.status(400).json({ ok: false, error: e.message });
+    }
   });
 
   app.get('/api/ledger/:userId', (req, res) => {

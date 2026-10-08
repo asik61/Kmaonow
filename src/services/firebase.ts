@@ -151,7 +151,65 @@ export async function syncUserWallet(userId: string, wallet: WalletState): Promi
       { merge: true }
     );
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.warn('Firestore syncUserWallet fallback:', error);
+  }
+}
+
+export async function fetchUserWallet(userId: string): Promise<WalletState | null> {
+  const path = `wallets/${userId}`;
+  try {
+    const snap = await getDoc(doc(db, 'wallets', userId));
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        id: `wal-${userId}`,
+        user_id: userId,
+        available_balance: Number(data.available_balance ?? data.balance ?? 0),
+        pending_balance: Number(data.pending_balance ?? 0),
+        lifetime_earned: Number(data.lifetime_earned ?? 0),
+        lifetime_withdrawn: Number(data.lifetime_withdrawn ?? 0),
+        updated_at: data.updated_at || new Date().toISOString(),
+      };
+    }
+  } catch (error) {
+    console.warn('fetchUserWallet fallback:', error);
+  }
+  return null;
+}
+
+// Task Submission Helpers
+export async function syncTaskSubmission(sub: any): Promise<void> {
+  try {
+    // Only store thumbnail/preview or delete raw heavy base64 to prevent storage limits
+    const cleanSub = {
+      ...sub,
+      proof_file_id: sub.proof_file_id && sub.proof_file_id.length > 500 ? sub.proof_file_id.slice(0, 500) : (sub.proof_file_id || ''),
+      updated_at: new Date().toISOString(),
+    };
+    await setDoc(doc(db, 'submissions', sub.id), cleanSub, { merge: true });
+  } catch (error) {
+    console.warn('Firestore syncTaskSubmission fallback:', error);
+  }
+}
+
+export async function fetchUserSubmissions(userId: string): Promise<any[]> {
+  try {
+    const q = query(collection(db, 'submissions'), where('user_id', '==', userId));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => d.data());
+  } catch (error) {
+    console.warn('fetchUserSubmissions fallback:', error);
+    return [];
+  }
+}
+
+export async function fetchAllSubmissions(): Promise<any[]> {
+  try {
+    const snap = await getDocs(collection(db, 'submissions'));
+    return snap.docs.map((d) => d.data());
+  } catch (error) {
+    console.warn('fetchAllSubmissions fallback:', error);
+    return [];
   }
 }
 

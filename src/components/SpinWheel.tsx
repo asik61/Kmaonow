@@ -462,6 +462,8 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
         setResEmoji(targetSeg.value >= 0.5 ? '🎉' : '⭐');
         setShowResultModal(true);
         playWinJingle();
+        // Credit reward to wallet immediately so it is never missed
+        onRewardWon(targetSeg.value);
       }
     };
 
@@ -469,9 +471,6 @@ export const SpinWheel: React.FC<SpinWheelProps> = ({
   };
 
   const handleClaim = () => {
-    if (wonSegment) {
-      onRewardWon(wonSegment.value);
-    }
     setShowResultModal(false);
   };
 

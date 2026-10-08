@@ -1,38 +1,136 @@
-# Robots.txt for Real Money App (realmoneyapp.online)
-# https://realmoneyapp.online/robots.txt
+# ============================================================
+# robots.txt — Real Money App (realmoneyapp.online)
+# SEO + AIO + GEO — Maximum Crawl Permissions
+# ============================================================
 
+# All standard crawlers — Full access
 User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /api/admin
+Disallow: /api/admin/
+Disallow: /admin/
+Disallow: /.env
+Disallow: /functions/
+Crawl-delay: 1
 
-# AI Search Crawlers & Generative Engine Optimization (GEO/AIO)
+# Google — Full access, no delay
 User-agent: Googlebot
 Allow: /
-
-User-agent: Googlebot-Favicon
-Allow: /
+Crawl-delay: 0
 
 User-agent: Googlebot-Image
 Allow: /
+Crawl-delay: 0
+
+User-agent: Googlebot-Favicon
+Allow: /
+Crawl-delay: 0
 
 User-agent: Google-Extended
 Allow: /
+Crawl-delay: 0
 
+User-agent: AdsBot-Google
+Allow: /
+
+# Bing / Microsoft
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 0
+
+User-agent: MSNBot
+Allow: /
+Crawl-delay: 0
+
+# Yahoo
+User-agent: Slurp
+Allow: /
+
+# DuckDuckGo
+User-agent: DuckDuckBot
+Allow: /
+
+# Yandex
+User-agent: YandexBot
+Allow: /
+Crawl-delay: 1
+
+# Baidu
+User-agent: Baiduspider
+Allow: /
+
+# ============================================================
+# AI Search & Generative Engine Optimization (GEO / AIO)
+# Allow all AI crawlers to index full content
+# ============================================================
+
+# ChatGPT / OpenAI
 User-agent: GPTBot
 Allow: /
+Crawl-delay: 0
 
-User-agent: ClaudeBot
+User-agent: OAI-SearchBot
 Allow: /
 
+User-agent: ChatGPT-User
+Allow: /
+
+# Perplexity AI
 User-agent: PerplexityBot
 Allow: /
+Crawl-delay: 0
 
+# Claude / Anthropic
+User-agent: ClaudeBot
+Allow: /
+Crawl-delay: 0
+
+User-agent: anthropic-ai
+Allow: /
+
+# Gemini / Google AI
+User-agent: Google-Extended
+Allow: /
+
+# Meta AI
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+# Apple
 User-agent: Applebot
 Allow: /
 
-User-agent: Bingbot
+User-agent: Applebot-Extended
 Allow: /
 
-# Sitemap Index
+# Amazon Alexa
+User-agent: ia_archiver
+Allow: /
+
+# You.com
+User-agent: YouBot
+Allow: /
+
+# Brave AI
+User-agent: BraveBot
+Allow: /
+
+# Cohere AI
+User-agent: cohere-ai
+Allow: /
+
+# Common Crawl (AI training data)
+User-agent: CCBot
+Allow: /
+
+# ============================================================
+# SITEMAP LOCATIONS
+# ============================================================
 Sitemap: https://realmoneyapp.online/sitemap.xml
+
+# ============================================================
+# HOST
+# ============================================================
+Host: https://realmoneyapp.online

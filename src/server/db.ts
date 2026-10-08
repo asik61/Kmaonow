@@ -356,7 +356,52 @@ class D1DatabaseManager {
 
   // User & Wallet
   getUser(userId: string) {
-    return this.data.users.find((u) => u.id === userId) || this.data.users[0];
+    return this.data.users.find((u) => u.id === userId) || null;
+  }
+
+  getUserByPhone(phone: string) {
+    const clean = phone.replace(/\D/g, '');
+    if (!clean) return null;
+    const last10 = clean.slice(-10);
+    return (
+      this.data.users.find((u) => {
+        const uClean = (u.phone || '').replace(/\D/g, '');
+        return uClean.endsWith(last10);
+      }) || null
+    );
+  }
+
+  saveUser(user: any) {
+    const cleanPhone = (user.phone || '').replace(/\D/g, '');
+    const normEmail = (user.email || '').trim().toLowerCase();
+    const idx = this.data.users.findIndex((u) => {
+      if (u.id === user.id) return true;
+      if (cleanPhone && (u.phone || '').replace(/\D/g, '') === cleanPhone) return true;
+      if (normEmail && (u.email || '').trim().toLowerCase() === normEmail) return true;
+      return false;
+    });
+
+    if (idx >= 0) {
+      this.data.users[idx] = { ...this.data.users[idx], ...user };
+      this.saveDatabase(this.data);
+      return this.data.users[idx];
+    }
+
+    const newUser = {
+      id: user.id || `usr-${cleanPhone || Date.now()}`,
+      name: user.name || 'User',
+      phone: user.phone || '',
+      email: user.email || '',
+      referral_code: user.referral_code || `RM${cleanPhone ? cleanPhone.slice(-4) : '0000'}`,
+      referred_by: user.referred_by || null,
+      is_blocked: user.is_blocked || false,
+      is_verified: user.is_verified ?? true,
+      role: user.role || 'user',
+      created_at: user.created_at || new Date().toISOString(),
+    };
+    this.data.users.push(newUser);
+    this.saveDatabase(this.data);
+    return newUser;
   }
 
   getWallet(userId: string) {
@@ -374,6 +419,40 @@ class D1DatabaseManager {
       this.data.wallets.push(wallet);
       this.saveDatabase(this.data);
     }
+    return wallet;
+  }
+
+  syncWallet(userId: string, incoming: any) {
+    let wallet = this.data.wallets.find((w) => w.user_id === userId);
+    const avail = Number(incoming.available_balance ?? incoming.balance ?? 0);
+    const pend = Number(incoming.pending_balance ?? 0);
+    const earned = Number(incoming.lifetime_earned ?? 0);
+    const withdrawn = Number(incoming.lifetime_withdrawn ?? 0);
+
+    if (!wallet) {
+      wallet = {
+        id: incoming.id || `wal-${Date.now()}`,
+        user_id: userId,
+        available_balance: avail,
+        pending_balance: pend,
+        lifetime_earned: Math.max(earned, avail),
+        lifetime_withdrawn: withdrawn,
+        updated_at: new Date().toISOString(),
+      };
+      this.data.wallets.push(wallet);
+    } else {
+      // Protect against wiping an existing positive balance to 0 on client reinstall
+      if (avail === 0 && wallet.available_balance > 0 && withdrawn === (wallet.lifetime_withdrawn || 0)) {
+        // Retain existing balance
+      } else {
+        wallet.available_balance = avail;
+      }
+      wallet.pending_balance = Math.max(wallet.pending_balance || 0, pend);
+      wallet.lifetime_earned = Math.max(wallet.lifetime_earned || 0, earned, wallet.available_balance);
+      wallet.lifetime_withdrawn = Math.max(wallet.lifetime_withdrawn || 0, withdrawn);
+      wallet.updated_at = new Date().toISOString();
+    }
+    this.saveDatabase(this.data);
     return wallet;
   }
 
@@ -526,6 +605,21 @@ class D1DatabaseManager {
 
   // Spin & Scratch
   recordSpinReward(userId: string, amount: number) {
+    const today = new Date().toISOString().slice(0, 10);
+    const usedToday = this.data.spin_history.filter(
+      (s) => s.user_id === userId && (s.created_at || '').slice(0, 10) === today
+    ).length;
+
+    if (usedToday >= 3) {
+      return {
+        ok: false,
+        error: 'Aaj ke 3 spins already use ho chuke hain!',
+        limitReached: true,
+        remaining: 0,
+        usedToday: 3,
+      };
+    }
+
     this.data.spin_history.unshift({
       id: `spin-${Date.now()}`,
       user_id: userId,
@@ -538,21 +632,45 @@ class D1DatabaseManager {
     wallet.lifetime_earned = Number((wallet.lifetime_earned + amount).toFixed(2));
     wallet.updated_at = new Date().toISOString();
 
+    const newUsed = usedToday + 1;
+    const remaining = Math.max(0, 3 - newUsed);
+
     this.data.ledger.unshift({
       id: `led-${Date.now()}`,
       user_id: userId,
       type: 'spin_reward',
       amount,
       status: 'credit',
-      description: `Lucky Spin & Win: ₹${amount.toFixed(2)}`,
+      description: `Daily Lucky Spin #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     });
 
     this.saveDatabase(this.data);
-    return { ok: true, available_balance: wallet.available_balance };
+    return {
+      ok: true,
+      available_balance: wallet.available_balance,
+      remaining,
+      usedToday: newUsed,
+      dailyLimit: 3,
+    };
   }
 
   recordScratchReward(userId: string, amount: number) {
+    const today = new Date().toISOString().slice(0, 10);
+    const usedToday = this.data.scratch_history.filter(
+      (s) => s.user_id === userId && (s.created_at || '').slice(0, 10) === today
+    ).length;
+
+    if (usedToday >= 3) {
+      return {
+        ok: false,
+        error: 'Aaj ke 3 scratch cards already use ho chuke hain!',
+        limitReached: true,
+        remaining: 0,
+        usedToday: 3,
+      };
+    }
+
     this.data.scratch_history.unshift({
       id: `sc-${Date.now()}`,
       user_id: userId,
@@ -565,18 +683,27 @@ class D1DatabaseManager {
     wallet.lifetime_earned = Number((wallet.lifetime_earned + amount).toFixed(2));
     wallet.updated_at = new Date().toISOString();
 
+    const newUsed = usedToday + 1;
+    const remaining = Math.max(0, 3 - newUsed);
+
     this.data.ledger.unshift({
       id: `led-${Date.now()}`,
       user_id: userId,
       type: 'scratch_reward',
       amount,
       status: 'credit',
-      description: `Scratch Card Win: ₹${amount.toFixed(2)}`,
+      description: `Daily Scratch Card #${newUsed} Reward: ₹${amount.toFixed(2)}`,
       created_at: new Date().toISOString(),
     });
 
     this.saveDatabase(this.data);
-    return { ok: true, available_balance: wallet.available_balance };
+    return {
+      ok: true,
+      available_balance: wallet.available_balance,
+      remaining,
+      usedToday: newUsed,
+      dailyLimit: 3,
+    };
   }
 
   claimDailyBonus(userId: string, amount = 0.50) {

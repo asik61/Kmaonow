@@ -1,16 +1,51 @@
 {
-  "id": "/",
-  "name": "Real Money",
+  "id": "https://realmoneyapp.online/",
+  "name": "Real Money App — Roz Paise Kamao",
   "short_name": "Real Money",
-  "description": "Daily Real Cash & Instant UPI Withdrawal",
+  "description": "India ka #1 earning app! Tasks complete karo, daily spin chalao, scratch cards scratcho aur instantly UPI me cash pao. Zero investment, real rewards.",
   "theme_color": "#047857",
   "background_color": "#022C22",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "start_url": "/?source=pwa",
   "scope": "/",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
+  "lang": "hi-IN",
+  "dir": "ltr",
   "prefer_related_applications": false,
+  "categories": ["finance", "productivity", "utilities"],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "icons": [
+    {
+      "src": "/favicon-16x16.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon-48x48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/pwa-192x192.png",
       "sizes": "192x192",
@@ -31,32 +66,72 @@
     },
     {
       "src": "/icon.svg",
-      "sizes": "512x512",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     }
   ],
+  "screenshots": [
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Real Money App — Home Screen"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Real Money App — Earn Dashboard"
+    }
+  ],
   "shortcuts": [
     {
-      "name": "Daily Spin & Win",
-      "short_name": "Spin",
-      "description": "Spin the lucky wheel for instant cash",
-      "url": "/?tab=spin&source=pwa",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "name": "Daily Spin — 3 Free Spins",
+      "short_name": "Free Spin",
+      "description": "Lucky wheel chalao aur instant cash jito",
+      "url": "/spin?source=pwa-shortcut",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Withdraw Cash",
+      "name": "Scratch Card — 3 Free Daily",
+      "short_name": "Scratch",
+      "description": "Free scratch card scratcho aur turant cash pao",
+      "url": "/scratch?source=pwa-shortcut",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Tasks & Offers",
+      "short_name": "Tasks",
+      "description": "High paying tasks aur offers complete karo",
+      "url": "/tasks?source=pwa-shortcut",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Instant UPI Withdrawal",
       "short_name": "Withdraw",
-      "description": "Instant UPI Cash Withdrawal",
-      "url": "/?tab=withdraw&source=pwa",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "description": "Turant UPI ya Bank me cash withdraw karo",
+      "url": "/withdraw?source=pwa-shortcut",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Refer & Earn",
+      "name": "Refer & Earn ₹5",
       "short_name": "Refer",
-      "description": "Invite friends and earn extra cash",
-      "url": "/?tab=refer&source=pwa",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "description": "Friends ko invite karo aur ₹5 bonus pao",
+      "url": "/refer?source=pwa-shortcut",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     }
-  ]
+  ],
+  "related_applications": [],
+  "share_target": {
+    "action": "/?share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

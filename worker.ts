@@ -65,13 +65,114 @@ export default {
         ).all();
         const tasks = (res.results || []).map((t: any) => ({
           ...t,
-          instructions: typeof t.instructions === 'string' ? JSON.parse(t.instructions) : t.instructions,
+          is_active: t.status === 'active',
+          is_top_offer: Boolean(t.is_top_offer),
+          is_trending: Boolean(t.is_trending),
+          is_admin_created: true,
+          instructions: typeof t.instructions === 'string' ? JSON.parse(t.instructions) : (t.instructions || []),
         }));
         return json(tasks);
       } catch (e: any) {
         return json({ error: e.message }, 500);
       }
     }
+
+    // 2A. GET ALL TASKS FOR ADMIN (Active & Paused)
+    if (pathname === '/api/admin/tasks' && method === 'GET') {
+      try {
+        const res = await env.DB.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all();
+        const tasks = (res.results || []).map((t: any) => ({
+          ...t,
+          is_active: t.status === 'active',
+          is_top_offer: Boolean(t.is_top_offer),
+          is_trending: Boolean(t.is_trending),
+          is_admin_created: true,
+          instructions: typeof t.instructions === 'string' ? JSON.parse(t.instructions) : (t.instructions || []),
+        }));
+        return json(tasks);
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    // 2B. CREATE OR UPDATE TASK (Admin D1 Persistence)
+    if (pathname === '/api/admin/tasks' && method === 'POST') {
+      try {
+        const t: any = await request.json();
+        const taskId = t.id || `task-admin-${Date.now()}`;
+        const status = (t.is_active === false || t.status === 'paused') ? 'paused' : 'active';
+        const instructions = JSON.stringify(
+          Array.isArray(t.instructions) ? t.instructions : ['Install app', 'Complete registration', 'Upload proof']
+        );
+
+        await env.DB.prepare(
+          `INSERT INTO tasks (id, title, subtitle, description, category, reward_amount, instructions, partner_url, image_url, icon_label, icon_bg, status, is_top_offer, is_trending)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             title = excluded.title,
+             subtitle = excluded.subtitle,
+             description = excluded.description,
+             category = excluded.category,
+             reward_amount = excluded.reward_amount,
+             instructions = excluded.instructions,
+             partner_url = excluded.partner_url,
+             image_url = excluded.image_url,
+             icon_label = excluded.icon_label,
+             icon_bg = excluded.icon_bg,
+             status = excluded.status,
+             is_top_offer = excluded.is_top_offer,
+             is_trending = excluded.is_trending`
+        )
+          .bind(
+            taskId,
+            t.title || 'New CPA Task',
+            t.subtitle || 'Install & Register',
+            t.description || 'Complete registration and submit proof.',
+            t.category || 'Register',
+            Number(t.reward_amount) || 50,
+            instructions,
+            t.partner_url || 'https://google.com',
+            t.image_url || '',
+            t.icon_label || 'TASK',
+            t.icon_bg || '#059669',
+            status,
+            t.is_top_offer ? 1 : 0,
+            t.is_trending ? 1 : 0
+          )
+          .run();
+
+        return json({ ok: true, taskId });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 2C. TOGGLE TASK STATUS (Admin)
+    if (pathname.startsWith('/api/admin/tasks/') && pathname.endsWith('/toggle') && method === 'POST') {
+      const parts = pathname.split('/');
+      const taskId = parts[parts.length - 2];
+      try {
+        const task: any = await env.DB.prepare('SELECT status FROM tasks WHERE id = ?').bind(taskId).first();
+        if (!task) return json({ ok: false, error: 'Task not found' }, 404);
+        const newStatus = task.status === 'active' ? 'paused' : 'active';
+        await env.DB.prepare('UPDATE tasks SET status = ? WHERE id = ?').bind(newStatus, taskId).run();
+        return json({ ok: true, status: newStatus });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 2D. DELETE TASK (Admin)
+    if (pathname.startsWith('/api/admin/tasks/') && method === 'DELETE') {
+      const taskId = pathname.split('/').pop() || '';
+      try {
+        await env.DB.prepare('DELETE FROM tasks WHERE id = ?').bind(taskId).run();
+        return json({ ok: true });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
 
     // 3. GET WALLET FOR USER
     if (pathname.startsWith('/api/wallet/') && method === 'GET') {
@@ -487,6 +588,122 @@ export default {
         return json({ ok: false, error: e.message }, 500);
       }
     }
+
+    // 11B. ADMIN REJECT WITHDRAWAL
+    if (pathname.startsWith('/api/admin/withdrawals/') && pathname.endsWith('/reject') && method === 'POST') {
+      try {
+        const parts = pathname.split('/');
+        const wdrId = parts[parts.length - 2];
+        const body: any = await request.json().catch(() => ({}));
+        const reason = body.reason || 'Invalid bank or UPI details.';
+
+        const wdr: any = await env.DB.prepare('SELECT * FROM withdrawals WHERE id = ? AND status = "pending"')
+          .bind(wdrId)
+          .first();
+
+        if (!wdr) return json({ ok: false, error: 'Withdrawal not found' }, 404);
+
+        await env.DB.prepare(
+          'UPDATE withdrawals SET status = "rejected", rejection_reason = ?, processed_at = CURRENT_TIMESTAMP WHERE id = ?'
+        )
+          .bind(reason, wdrId)
+          .run();
+
+        // Refund back to available balance
+        await env.DB.prepare(
+          'UPDATE wallets SET available_balance = available_balance + ?, pending_balance = MAX(0, pending_balance - ?), updated_at = CURRENT_TIMESTAMP WHERE user_id = ?'
+        )
+          .bind(wdr.amount, wdr.amount, wdr.user_id)
+          .run();
+
+        return json({ ok: true });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 11C. ADMIN REJECT SUBMISSION
+    if (pathname.startsWith('/api/admin/submissions/') && pathname.endsWith('/reject') && method === 'POST') {
+      try {
+        const parts = pathname.split('/');
+        const subId = parts[parts.length - 2];
+        const body: any = await request.json().catch(() => ({}));
+        const reason = body.reason || 'Screenshot proof rejected.';
+
+        const sub: any = await env.DB.prepare('SELECT * FROM task_submissions WHERE id = ? AND status = "pending"')
+          .bind(subId)
+          .first();
+
+        if (!sub) return json({ ok: false, error: 'Submission not pending or not found' }, 404);
+
+        await env.DB.prepare(
+          'UPDATE task_submissions SET status = "rejected", admin_note = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?'
+        )
+          .bind(reason, subId)
+          .run();
+
+        await env.DB.prepare(
+          'UPDATE wallets SET pending_balance = MAX(0, pending_balance - ?), updated_at = CURRENT_TIMESTAMP WHERE user_id = ?'
+        )
+          .bind(sub.reward_amount, sub.user_id)
+          .run();
+
+        return json({ ok: true });
+      } catch (e: any) {
+        return json({ ok: false, error: e.message }, 500);
+      }
+    }
+
+    // 11D. ADMIN ALL SUBMISSIONS
+    if (pathname === '/api/admin/submissions' && method === 'GET') {
+      try {
+        const res = await env.DB.prepare('SELECT * FROM task_submissions ORDER BY submitted_at DESC LIMIT 100').all();
+        return json(res.results || []);
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    // 11E. ADMIN ALL WITHDRAWALS
+    if (pathname === '/api/admin/withdrawals' && method === 'GET') {
+      try {
+        const res = await env.DB.prepare('SELECT * FROM withdrawals ORDER BY requested_at DESC LIMIT 100').all();
+        return json(res.results || []);
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    // 11F. ADMIN ALL USERS
+    if (pathname === '/api/admin/users' && method === 'GET') {
+      try {
+        const res = await env.DB.prepare('SELECT * FROM users ORDER BY created_at DESC LIMIT 100').all();
+        return json(res.results || []);
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
+    // 11G. ADMIN STATS
+    if (pathname === '/api/admin/stats' && method === 'GET') {
+      try {
+        const [usersCount, subsCount, wdrsCount, tasksCount]: any[] = await Promise.all([
+          env.DB.prepare('SELECT COUNT(*) as count FROM users').first(),
+          env.DB.prepare('SELECT COUNT(*) as count FROM task_submissions WHERE status = "pending"').first(),
+          env.DB.prepare('SELECT COUNT(*) as count FROM withdrawals WHERE status = "pending"').first(),
+          env.DB.prepare('SELECT COUNT(*) as count FROM tasks WHERE status = "active"').first(),
+        ]);
+        return json({
+          totalUsers: usersCount?.count || 0,
+          pendingSubmissions: subsCount?.count || 0,
+          pendingWithdrawals: wdrsCount?.count || 0,
+          totalActiveTasks: tasksCount?.count || 0,
+        });
+      } catch (e: any) {
+        return json({ error: e.message }, 500);
+      }
+    }
+
 
     // 12. FALLBACK TO STATIC ASSETS (Frontend PWA files in dist)
     if (env.ASSETS) {

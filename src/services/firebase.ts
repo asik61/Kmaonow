@@ -9,10 +9,11 @@ import {
   collection,
   query,
   where,
-  getDocs
+  getDocs,
+  deleteDoc,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import type { UserProfile, WalletState } from '../types/kamaonow';
+import type { UserProfile, WalletState, TaskItem } from '../types/kamaonow';
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -234,4 +235,31 @@ export async function loginWithFirebaseGoogle(): Promise<{
 
 export async function logoutFromFirebase(): Promise<void> {
   await fbSignOut(auth);
+}
+
+// Tasks / Offers Cloud Storage Helpers (Dual-Persistence Backup)
+export async function syncTaskToFirestore(task: TaskItem): Promise<void> {
+  try {
+    await setDoc(doc(db, 'tasks', task.id), task, { merge: true });
+  } catch (error) {
+    console.warn('Firestore syncTaskToFirestore fallback:', error);
+  }
+}
+
+export async function fetchTasksFromFirestore(): Promise<TaskItem[]> {
+  try {
+    const snap = await getDocs(collection(db, 'tasks'));
+    return snap.docs.map((d) => d.data() as TaskItem);
+  } catch (error) {
+    console.warn('fetchTasksFromFirestore fallback:', error);
+    return [];
+  }
+}
+
+export async function deleteTaskFromFirestore(taskId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'tasks', taskId));
+  } catch (error) {
+    console.warn('deleteTaskFromFirestore fallback:', error);
+  }
 }

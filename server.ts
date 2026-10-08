@@ -85,6 +85,12 @@ async function startServer() {
     res.json({ ok: true });
   });
 
+  app.post('/api/admin/tasks/:id/toggle', (req, res) => {
+    const updated = db.toggleTask(req.params.id);
+    if (!updated) return res.status(404).json({ ok: false, error: 'Task not found' });
+    res.json({ ok: true, task: updated });
+  });
+
   // 3. Task Submissions (Screenshots / Proofs)
   app.post('/api/tasks/:id/submit', (req, res) => {
     try {

@@ -385,6 +385,14 @@ class D1DatabaseManager {
     return true;
   }
 
+  toggleTask(taskId: string) {
+    const task = this.data.tasks.find((t) => t.id === taskId);
+    if (!task) return null;
+    task.status = task.status === 'active' ? 'paused' : 'active';
+    this.saveDatabase(this.data);
+    return task;
+  }
+
   // Submissions
   submitTaskProof(userId: string, taskId: string, proofFileId: string) {
     const task = this.data.tasks.find((t) => t.id === taskId);

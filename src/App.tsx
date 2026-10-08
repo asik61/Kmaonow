@@ -79,7 +79,14 @@ import { HomeBannerSlider } from './components/HomeBannerSlider';
 import { EarningsCardImage } from './components/EarningsCardImage';
 import { AuthScreen } from './components/AuthScreen';
 import { SplashScreen } from './components/SplashScreen';
-import { testConnection, syncUserWallet, logoutFromFirebase } from './services/firebase';
+import {
+  testConnection,
+  syncUserWallet,
+  logoutFromFirebase,
+  syncTaskToFirestore,
+  fetchTasksFromFirestore,
+  deleteTaskFromFirestore,
+} from './services/firebase';
 import { NotificationModal } from './components/NotificationModal';
 import { RulesModal } from './components/RulesModal';
 import {
@@ -210,22 +217,12 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const validTasks = parsed.filter(
-            (t: TaskItem) =>
-              t.is_admin_created ||
-              t.created_by === 'admin' ||
-              t.id.startsWith('task-admin-')
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const hasNavi = parsed.some(
+            (t) => t.id === NAVI_TASK.id || (t.title && t.title.toLowerCase().includes('navi'))
           );
-          const hasNavi = validTasks.some(
-            (t) => t.id === NAVI_TASK.id || t.title.toLowerCase().includes('navi')
-          );
-          if (!hasNavi) {
-            return [NAVI_TASK, ...validTasks];
-          }
-          return validTasks;
+          return hasNavi ? parsed : [NAVI_TASK, ...parsed];
         }
-        return [NAVI_TASK];
       } catch {
         return INITIAL_TASKS;
       }
@@ -493,14 +490,45 @@ export default function App() {
         localStorage.setItem('kamaonow_ledger', JSON.stringify(ledgerData));
       }
 
-      // Tasks (shared for all users — admin created)
-      const tasksRes = await fetch('/api/tasks');
-      if (tasksRes.ok) {
-        const tasksData = await tasksRes.json();
-        if (Array.isArray(tasksData) && tasksData.length > 0) {
-          setTasks(tasksData);
-          localStorage.setItem('kamaonow_tasks', JSON.stringify(tasksData));
+      // Tasks (Dual-Engine: Cloudflare D1 + Firebase Firestore + Local Storage)
+      try {
+        let serverTasks: TaskItem[] = [];
+        const tasksRes = await fetch('/api/tasks');
+        if (tasksRes.ok) {
+          const fetched = await tasksRes.json();
+          if (Array.isArray(fetched)) serverTasks = fetched;
         }
+
+        // Firestore backup tasks
+        const firestoreTasks = await fetchTasksFromFirestore().catch(() => []);
+
+        // Local storage tasks
+        const localSaved = localStorage.getItem('kamaonow_tasks');
+        let localTasks: TaskItem[] = [];
+        if (localSaved) {
+          try { localTasks = JSON.parse(localSaved); } catch {}
+        }
+
+        // Safe merge without duplicates: D1 + Firestore + Local + Navi Task
+        const taskMap = new Map<string, TaskItem>();
+        taskMap.set(NAVI_TASK.id, NAVI_TASK);
+        if (Array.isArray(localTasks)) {
+          localTasks.forEach((t) => { if (t?.id) taskMap.set(t.id, t); });
+        }
+        if (Array.isArray(firestoreTasks)) {
+          firestoreTasks.forEach((t) => { if (t?.id) taskMap.set(t.id, t); });
+        }
+        if (Array.isArray(serverTasks)) {
+          serverTasks.forEach((t) => { if (t?.id) taskMap.set(t.id, t); });
+        }
+
+        const mergedTasks = Array.from(taskMap.values());
+        if (mergedTasks.length > 0) {
+          setTasks(mergedTasks);
+          localStorage.setItem('kamaonow_tasks', JSON.stringify(mergedTasks));
+        }
+      } catch (e) {
+        console.warn('Tasks sync error, preserved local tasks:', e);
       }
 
       // Submissions for this user
@@ -1233,29 +1261,25 @@ export default function App() {
     }
   };
 
-  const handleAdminSaveTask = (taskData: Partial<TaskItem>) => {
-    // D1 mein save karo
-    fetch('/api/admin/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(taskData),
-    }).then(() => {
-      fetch('/api/tasks').then(r => r.json()).then((data: any) => {
-        if (Array.isArray(data) && data.length > 0) setTasks(data);
-      }).catch(console.warn);
-    }).catch(console.warn);
+  const handleAdminSaveTask = async (taskData: Partial<TaskItem>) => {
+    let taskToSave: TaskItem;
 
     if (taskData.id) {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskData.id
-            ? ({ ...t, ...taskData, is_admin_created: true, created_by: 'admin' } as TaskItem)
-            : t
-        )
-      );
+      const existing = tasks.find((t) => t.id === taskData.id);
+      taskToSave = {
+        ...existing,
+        ...taskData,
+        is_admin_created: true,
+        created_by: 'admin',
+      } as TaskItem;
+      setTasks((prev) => {
+        const updated = prev.map((t) => (t.id === taskData.id ? taskToSave : t));
+        localStorage.setItem('kamaonow_tasks', JSON.stringify(updated));
+        return updated;
+      });
       showToast('Offer updated successfully! ✓');
     } else {
-      const newTask: TaskItem = {
+      taskToSave = {
         id: `task-admin-${Date.now()}`,
         created_by: 'admin',
         is_admin_created: true,
@@ -1274,19 +1298,47 @@ export default function App() {
         is_trending: !!taskData.is_trending,
         created_at: new Date().toISOString(),
       };
-      setTasks([newTask, ...tasks]);
+      setTasks((prev) => {
+        const updated = [taskToSave, ...prev];
+        localStorage.setItem('kamaonow_tasks', JSON.stringify(updated));
+        return updated;
+      });
       showToast('New offer created and published! 🚀');
+    }
+
+    // 1. Cloudflare D1 Database Save
+    try {
+      await fetch('/api/admin/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskToSave),
+      });
+    } catch (e) {
+      console.warn('D1 task save fallback:', e);
+    }
+
+    // 2. Firestore Cloud Database Backup
+    try {
+      await syncTaskToFirestore(taskToSave);
+    } catch (e) {
+      console.warn('Firestore task sync fallback:', e);
     }
   };
 
   const handleAdminToggleTaskActive = (taskId: string) => {
     const target = tasks.find((t) => t.id === taskId);
     const willBeActive = target ? target.is_active === false : true;
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, is_active: willBeActive } : t))
-    );
+    setTasks((prev) => {
+      const updated = prev.map((t) => (t.id === taskId ? { ...t, is_active: willBeActive } : t));
+      localStorage.setItem('kamaonow_tasks', JSON.stringify(updated));
+      return updated;
+    });
     // D1 mein bhi toggle karo
     fetch(`/api/admin/tasks/${taskId}/toggle`, { method: 'POST' }).catch(console.warn);
+    // Firestore sync
+    if (target) {
+      syncTaskToFirestore({ ...target, is_active: willBeActive }).catch(console.warn);
+    }
     showToast(
       willBeActive
         ? `"${target?.title}" is now LIVE! 🟢`
@@ -1296,9 +1348,15 @@ export default function App() {
 
   const handleAdminDeleteTask = (taskId: string) => {
     const target = tasks.find((t) => t.id === taskId);
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setTasks((prev) => {
+      const updated = prev.filter((t) => t.id !== taskId);
+      localStorage.setItem('kamaonow_tasks', JSON.stringify(updated));
+      return updated;
+    });
     // D1 mein bhi delete karo
     fetch(`/api/admin/tasks/${taskId}`, { method: 'DELETE' }).catch(console.warn);
+    // Firestore delete
+    deleteTaskFromFirestore(taskId).catch(console.warn);
     showToast(`"${target?.title || 'Offer'}" deleted successfully.`);
   };
 

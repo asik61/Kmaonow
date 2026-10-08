@@ -59,5 +59,11 @@ service cloud.firestore {
       allow create, update: if true;
       allow delete: if isAdmin();
     }
+
+    // Tasks (Offers)
+    match /tasks/{taskId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
   }
 }

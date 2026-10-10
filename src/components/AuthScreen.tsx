@@ -143,8 +143,13 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
       console.warn('Firebase Google Auth error:', err);
       setLoading(false);
       const msg = String(err?.message || err || '');
-      if (msg.includes('closed-by-user') || msg.includes('cancelled') || msg.includes('popup-closed')) {
-        setError('Login pop-up band ho gaya tha. Kripya dobara try karein.');
+      if (
+        msg.includes('closed-by-user') ||
+        msg.includes('cancelled') ||
+        msg.includes('popup-closed') ||
+        msg.includes('12501')
+      ) {
+        setError('Login cancel ho gaya. Kripya dobara "Continue with Google" dabayein.');
       } else {
         setError('Google login connect nahi ho paya. Kripya dobara "Continue with Google" dabayein.');
       }

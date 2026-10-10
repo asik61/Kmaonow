@@ -256,54 +256,64 @@ export async function checkFirebaseRedirectResult(): Promise<{
   return null;
 }
 
-// Real Firebase Google Login trigger
-// FIX 1: In APK WebView, ALWAYS use signInWithPopup because signInWithRedirect
-// fails with "missing initial state" when sessionStorage gets cleared on redirect.
+// Real Firebase Google Login trigger with Native Account Chooser Support
 export async function loginWithFirebaseGoogle(): Promise<{
   uid: string;
   name: string;
   email: string;
   photoURL: string;
 } | null> {
-  const isAPK = isRunningInAPK();
-
-  if (isAPK) {
-    // In APK: signInWithPopup is handled cleanly by MainActivity.java WebChromeClient onCreateWindow
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-    return {
-      uid: user.uid,
-      name: user.displayName || 'Google User',
-      email: user.email || '',
-      photoURL:
-        user.photoURL ||
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-    };
-  } else {
-    // In Browser and PWA: try popup; if popup is blocked, fall back to redirect
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      return {
-        uid: user.uid,
-        name: user.displayName || 'Google User',
-        email: user.email || '',
-        photoURL:
-          user.photoURL ||
-          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+  // 1. Android APK Native Bridge: Triggers real Google Account Chooser bottom-sheet ("choose wala")
+  if (
+    typeof window !== 'undefined' &&
+    (window as any).AndroidBridge &&
+    typeof (window as any).AndroidBridge.loginWithGoogle === 'function'
+  ) {
+    return new Promise((resolve, reject) => {
+      // Set one-time success callback
+      (window as any).onNativeGoogleLoginSuccess = (account: {
+        uid: string;
+        name: string;
+        email: string;
+        photoURL?: string;
+      }) => {
+        resolve({
+          uid: account.uid || `usr-${Date.now()}`,
+          name: account.name || 'Google User',
+          email: account.email || '',
+          photoURL:
+            account.photoURL ||
+            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+        });
       };
-    } catch (popupErr: any) {
-      if (
-        popupErr?.code === 'auth/popup-blocked' ||
-        popupErr?.code === 'auth/cancelled-popup-request'
-      ) {
-        console.info('Popup blocked in browser, falling back to signInWithRedirect...');
-        await signInWithRedirect(auth, googleProvider);
-        return null;
+
+      // Set one-time error callback
+      (window as any).onNativeGoogleLoginError = (err: string) => {
+        reject(new Error(err || 'Google sign-in cancelled or failed'));
+      };
+
+      // Invoke Android Native Google Account Chooser
+      try {
+        (window as any).AndroidBridge.loginWithGoogle();
+      } catch (bridgeErr) {
+        reject(bridgeErr);
       }
-      throw popupErr;
-    }
+    });
   }
+
+  // 2. Browser & PWA: Clean popup with account chooser (prompt=select_account)
+  // NEVER use signInWithRedirect because mobile webviews lose sessionStorage
+  // and trigger the "Unable to process request due to missing initial state" error.
+  const result = await signInWithPopup(auth, googleProvider);
+  const user = result.user;
+  return {
+    uid: user.uid,
+    name: user.displayName || 'Google User',
+    email: user.email || '',
+    photoURL:
+      user.photoURL ||
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+  };
 }
 
 export async function logoutFromFirebase(): Promise<void> {

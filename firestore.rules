@@ -65,5 +65,12 @@ service cloud.firestore {
       allow read: if true;
       allow create, update, delete: if true;
     }
+
+    // Device bindings (1 Phone = 1 Account Anti-Fraud)
+    match /devices/{deviceId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
   }
 }

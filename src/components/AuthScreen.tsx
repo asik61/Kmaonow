@@ -16,6 +16,11 @@ import {
   syncUserProfile,
   findUserByEmail,
 } from '../services/firebase';
+import {
+  getDeviceInfo,
+  verifyDeviceBinding,
+  bindDeviceToUser,
+} from '../services/deviceSecurity';
 
 interface AuthScreenProps {
   onLoginSuccess: (user: UserProfile, isNewUser: boolean) => void;
@@ -64,7 +69,24 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
         }
       }
 
-      // 3. Check Cloudflare D1
+      // 3. Strict "1 Phone = 1 Account" Hardware & Device Binding Enforcement
+      const deviceInfo = getDeviceInfo();
+      const bindingCheck = await verifyDeviceBinding(
+        deviceInfo.deviceId,
+        normEmail,
+        existingUser?.id
+      );
+
+      if (!bindingCheck.allowed) {
+        setLoading(false);
+        setError(
+          bindingCheck.errorMessage ||
+            'Ek mobile par sirf 1 hi account chal sakta hai. Is phone par pehle se dusra account registered hai.'
+        );
+        return;
+      }
+
+      // 4. Check Cloudflare D1
       if (!existingUser) {
         try {
           const res = await fetch(`/api/user/by-email/${encodeURIComponent(normEmail)}`);
@@ -98,7 +120,13 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
           existingUser?.avatar_url ||
           'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
         created_at: existingUser?.created_at || new Date().toISOString(),
+        device_id: deviceInfo.deviceId,
+        device_model: deviceInfo.deviceModel,
+        last_active: new Date().toISOString(),
       };
+
+      // Bind device to account permanently
+      bindDeviceToUser(finalUser, deviceInfo.deviceId, deviceInfo.deviceModel).catch(console.warn);
 
       // Sync user profile to Firestore & D1 backend
       syncUserProfile(finalUser).catch(console.warn);

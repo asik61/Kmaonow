@@ -8,6 +8,9 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.content.SharedPreferences;
+import java.util.UUID;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.webkit.GeolocationPermissions;
@@ -409,6 +412,55 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public boolean isNativeApp() {
             return true;
+        }
+
+        @JavascriptInterface
+        public String getDeviceId() {
+            try {
+                @SuppressLint("HardwareIds")
+                String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+                if (androidId != null && !androidId.trim().isEmpty() && !"9774d56d682e549c".equals(androidId)) {
+                    return androidId.trim().toLowerCase();
+                }
+            } catch (Exception ignored) {}
+            try {
+                SharedPreferences prefs = getSharedPreferences("app_device_meta", MODE_PRIVATE);
+                String uuid = prefs.getString("unique_device_id", null);
+                if (uuid == null) {
+                    uuid = UUID.randomUUID().toString().replace("-", "");
+                    prefs.edit().putString("unique_device_id", uuid).apply();
+                }
+                return uuid;
+            } catch (Exception e) {
+                return "dev-" + System.currentTimeMillis();
+            }
+        }
+
+        @JavascriptInterface
+        public String getDeviceModel() {
+            try {
+                return (Build.MANUFACTURER + " " + Build.MODEL).trim();
+            } catch (Exception e) {
+                return "Android Device";
+            }
+        }
+
+        @JavascriptInterface
+        public String getDeviceBrand() {
+            try {
+                return Build.BRAND != null ? Build.BRAND : "";
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
+        @JavascriptInterface
+        public String getAppVersion() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception e) {
+                return "1.0.0";
+            }
         }
 
         @JavascriptInterface

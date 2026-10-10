@@ -154,3 +154,19 @@ export interface BroadcastNotice {
   action_tab?: string;
 }
 
+declare global {
+  interface Window {
+    AndroidBridge?: {
+      isNativeApp?: () => boolean;
+      showToast?: (msg: string) => void;
+      getDeviceId?: () => string;
+      getDeviceModel?: () => string;
+      getDeviceBrand?: () => string;
+      getAppVersion?: () => string;
+      launchGoogleAccountChooser?: () => void;
+    };
+    onNativeGoogleLoginSuccess?: (data: string) => void;
+    onNativeGoogleLoginError?: (err: string) => void;
+  }
+}
+

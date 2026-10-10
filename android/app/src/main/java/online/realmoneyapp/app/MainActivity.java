@@ -62,7 +62,10 @@ public class MainActivity extends AppCompatActivity {
         webView = findViewById(R.id.webView);
 
         swipeRefresh.setColorSchemeResources(R.color.primary, R.color.accent);
-        swipeRefresh.setOnRefreshListener(() -> webView.reload());
+        swipeRefresh.setOnRefreshListener(() -> {
+            webView.clearCache(true);
+            webView.reload();
+        });
 
         setupWebView();
 
@@ -85,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setSupportZoom(false);
         webSettings.setDisplayZoomControls(false);
+        webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
         // Sanitize User-Agent to allow Google OAuth without "disallowed_useragent" (Error 403)
         String defaultUserAgent = webSettings.getUserAgentString();

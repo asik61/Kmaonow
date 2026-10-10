@@ -57,6 +57,11 @@ export default {
       return res;
     }
 
+    // Safety guard: if D1 database is not yet bound in wrangler.toml, handle gracefully
+    if (pathname.startsWith('/api/') && !env.DB) {
+      return json({ error: 'D1 database not configured yet in wrangler.toml. Using client/Firestore fallback.', fallback: true }, 503);
+    }
+
     // 2. GET ACTIVE TASKS
     if (pathname === '/api/tasks' && method === 'GET') {
       try {

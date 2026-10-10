@@ -7,7 +7,11 @@ send_metrics = false
 directory = "./dist"
 not_found_handling = "single-page-application"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "kmaonow-db"
-database_id = "local-d1-binding"
+# NOTE: If using Cloudflare D1 Database, create it first via:
+# `npx wrangler d1 create kmaonow-db`
+# or in Cloudflare Dashboard -> Workers & Pages -> D1.
+# Then replace YOUR_DATABASE_ID with the real UUID and uncomment:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "kmaonow-db"
+# database_id = "YOUR_DATABASE_ID"

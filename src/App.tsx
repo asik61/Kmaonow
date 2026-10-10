@@ -73,6 +73,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { WithdrawModal } from './components/WithdrawModal';
 import { AdminPanel } from './components/AdminPanel';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
+import { isNativeAndroidApp } from './hooks/usePWAInstall';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { APP_VERSION } from './version';
 import { applyUpdate } from './utils/autoUpdater';
@@ -175,6 +176,19 @@ const TaskIconBadge: React.FC<{
   );
 };
 
+function isValidLoggedInUser(u: any): boolean {
+  return (
+    !!u &&
+    typeof u === 'object' &&
+    typeof u.id === 'string' &&
+    u.id.trim().length > 3 &&
+    u.id !== 'usr-rohan-01' &&
+    !u.id.includes('demo') &&
+    typeof u.email === 'string' &&
+    u.email.includes('@')
+  );
+}
+
 export default function App() {
   // Tab URL se initialize hoga — Google se /spin pe aaya to spin khulega
   const [activeTab, setActiveTab] = useState<NavTab>(() => getTabFromPath());
@@ -183,18 +197,34 @@ export default function App() {
   const [taskCategory, setTaskCategory] = useState<TaskCategory>('All');
   const [offerCategory, setOfferCategory] = useState<'All' | 'Top Offers' | 'Trending' | 'New'>('All');
 
-  // Core Data
+  // Core Data - Strict check: user must be authenticated with Google
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('kamaonow_user');
-    return saved ? JSON.parse(saved) : INITIAL_USER;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (isValidLoggedInUser(parsed)) {
+          return parsed;
+        }
+      } catch {}
+    }
+    return INITIAL_USER;
   });
   const [avatarImgError, setAvatarImgError] = useState(false);
 
   const [showSplash, setShowSplash] = useState<boolean>(() => {
     return !sessionStorage.getItem('kamao_splash_shown');
   });
+
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return !!localStorage.getItem('kamaonow_user');
+    const saved = localStorage.getItem('kamaonow_user');
+    if (!saved) return false;
+    try {
+      const parsed = JSON.parse(saved);
+      return isValidLoggedInUser(parsed);
+    } catch {
+      return false;
+    }
   });
 
   const [wallet, setWallet] = useState<WalletState>(() => {
@@ -391,27 +421,48 @@ export default function App() {
       localStorage.setItem(PURGE_KEY, 'true');
     }
 
-    // Always fetch live real tasks from database on mount
-    fetch('/api/tasks')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setTasks(data);
-          localStorage.setItem('kamaonow_tasks', JSON.stringify(data));
+    // Always fetch live real tasks from database and Firestore on mount
+    const loadLiveTasks = async () => {
+      try {
+        const res = await fetch('/api/tasks');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setTasks(data);
+            localStorage.setItem('kamaonow_tasks', JSON.stringify(data));
+            return;
+          }
         }
-      })
-      .catch(console.warn);
+      } catch (err) {
+        console.warn('API tasks load fallback:', err);
+      }
 
-    // Bug 6 Fix: Only sync from D1 if user is ACTUALLY logged in and not the default unauthenticated demo user
-    const hasLoggedInUser = !!localStorage.getItem('kamaonow_user');
-    if (hasLoggedInUser && user?.id && user.id !== 'usr-rohan-01') {
+      // Firestore cloud tasks backup load
+      try {
+        const cloudTasks = await fetchTasksFromFirestore();
+        if (Array.isArray(cloudTasks) && cloudTasks.length > 0) {
+          setTasks(cloudTasks);
+          localStorage.setItem('kamaonow_tasks', JSON.stringify(cloudTasks));
+        }
+      } catch (err) {
+        console.warn('Firestore tasks load fallback:', err);
+      }
+    };
+    loadLiveTasks();
+
+    // Only sync from D1 if user is ACTUALLY logged in with a valid account
+    if (isLoggedIn && isValidLoggedInUser(user)) {
       loadUserDataFromD1(user.id);
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('kamaonow_user', JSON.stringify(user));
-  }, [user]);
+    if (isLoggedIn && isValidLoggedInUser(user)) {
+      localStorage.setItem('kamaonow_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('kamaonow_user');
+    }
+  }, [user, isLoggedIn]);
 
   useEffect(() => {
     localStorage.setItem('kamaonow_wallet', JSON.stringify(wallet));
@@ -1306,9 +1357,14 @@ export default function App() {
 
     if (taskData.id) {
       const existing = tasks.find((t) => t.id === taskData.id);
+      const rewardVal =
+        typeof taskData.reward_amount === 'number' && !isNaN(taskData.reward_amount)
+          ? taskData.reward_amount
+          : existing?.reward_amount || 10;
       taskToSave = {
         ...existing,
         ...taskData,
+        reward_amount: rewardVal,
         is_admin_created: true,
         created_by: 'admin',
       } as TaskItem;
@@ -1319,6 +1375,10 @@ export default function App() {
       });
       showToast('Offer updated successfully! ✓');
     } else {
+      const rewardVal =
+        typeof taskData.reward_amount === 'number' && !isNaN(taskData.reward_amount) && taskData.reward_amount > 0
+          ? taskData.reward_amount
+          : 10;
       taskToSave = {
         id: `task-admin-${Date.now()}`,
         created_by: 'admin',
@@ -1327,7 +1387,7 @@ export default function App() {
         subtitle: taskData.subtitle || 'Install & Register',
         description: taskData.description || 'Complete registration and submit proof.',
         category: taskData.category || 'Register',
-        reward_amount: Number(taskData.reward_amount) || 50,
+        reward_amount: rewardVal,
         instructions: taskData.instructions || ['Install the app.', 'Complete registration.', 'Upload proof.'],
         partner_url: taskData.partner_url || 'https://google.com',
         icon_label: taskData.icon_label || 'NEW',
@@ -1706,6 +1766,7 @@ export default function App() {
   const handleLogout = () => {
     logoutFromFirebase().catch(console.warn);
     localStorage.removeItem('kamaonow_user');
+    setUser(INITIAL_USER);
     setIsLoggedIn(false);
     showToast('Logged out successfully.');
   };
@@ -1829,8 +1890,8 @@ export default function App() {
 
       {/* MAIN MOBILE APP CANVAS (Compact & Mobile Friendly Spacing) */}
       <main className="w-full max-w-md md:max-w-xl mx-auto px-3.5 pt-2.5 pb-6 space-y-2.5 grow">
-        {/* PWA Install Banner */}
-        <PWAInstallBanner />
+        {/* PWA Install Banner (Strictly hidden inside native Android APK) */}
+        {!isNativeAndroidApp() && <PWAInstallBanner />}
 
         {/* ========================================================= */}
         {/* TAB 1: HOME SCREEN (100% Pixel & 3D Match to Reference Mockup) */}
@@ -2547,8 +2608,11 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-base font-black text-slate-900">{user.name}</h2>
-                  <p className="text-xs text-emerald-700 font-mono font-bold">{user.email}</p>
-                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">+91 {user.phone}</p>
+                  <p className="text-xs text-emerald-700 font-mono font-bold truncate max-w-[200px]">{user.email}</p>
+                  <p className="text-[11px] text-emerald-700 font-semibold mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                    <span>{user.phone ? `+91 ${user.phone}` : 'Google Verified Account'}</span>
+                  </p>
                 </div>
               </div>
 

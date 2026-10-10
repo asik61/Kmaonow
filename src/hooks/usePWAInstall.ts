@@ -13,8 +13,38 @@ declare global {
 }
 
 // Check if currently running in standalone installed mode (PWA, TWA, or native Android APK)
+export const isNativeAndroidApp = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const ua = (window.navigator.userAgent || '').toLowerCase();
+  const search = window.location.search.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+
+  return (
+    ua.includes('realmoneyapp') ||
+    ua.includes('standalone') ||
+    ua.includes('android apk') ||
+    ua.includes('wv') ||
+    ua.includes('bubblewrap') ||
+    ua.includes('twa') ||
+    search.includes('source=apk') ||
+    search.includes('utm_source=twa') ||
+    search.includes('source=pwa') ||
+    hash.includes('source=apk') ||
+    hash.includes('source=pwa') ||
+    document.referrer.includes('android-app://') ||
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true
+  );
+};
+
 export const checkIsPWAInstalled = (): boolean => {
   if (typeof window === 'undefined') return false;
+
+  if (isNativeAndroidApp()) {
+    localStorage.setItem('pwa_app_installed', 'true');
+    return true;
+  }
 
   const isStandaloneMatch =
     window.matchMedia('(display-mode: standalone)').matches ||
@@ -23,27 +53,9 @@ export const checkIsPWAInstalled = (): boolean => {
 
   const isIOSStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
 
-  // Check URL parameters commonly set by PWA / TWA (PWABuilder / Bubblewrap sets ?source=pwa or ?utm_source=twa)
-  const search = window.location.search.toLowerCase();
-  const hash = window.location.hash.toLowerCase();
-  const isUrlPWA =
-    search.includes('source=pwa') ||
-    search.includes('utm_source=twa') ||
-    search.includes('source=apk') ||
-    search.includes('android-app') ||
-    hash.includes('source=pwa');
-
-  // Check if running inside Android TWA / WebView
-  const ua = (window.navigator.userAgent || '').toLowerCase();
-  const isAndroidApp =
-    ua.includes('wv') || // Android WebView indicator
-    ua.includes('bubblewrap') ||
-    ua.includes('twa') ||
-    document.referrer.includes('android-app://');
-
   const isStorageMarked = localStorage.getItem('pwa_app_installed') === 'true';
 
-  if (isStandaloneMatch || isIOSStandalone || isUrlPWA || isAndroidApp) {
+  if (isStandaloneMatch || isIOSStandalone) {
     localStorage.setItem('pwa_app_installed', 'true');
     return true;
   }

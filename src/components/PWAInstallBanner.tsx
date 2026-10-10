@@ -7,7 +7,7 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react';
-import { usePWAInstall } from '../hooks/usePWAInstall';
+import { usePWAInstall, isNativeAndroidApp } from '../hooks/usePWAInstall';
 
 export const PWAInstallBanner: React.FC = () => {
   const { isInstallable, isInstalled, isIOS, install, markAsInstalled } = usePWAInstall();
@@ -19,8 +19,8 @@ export const PWAInstallBanner: React.FC = () => {
   const [isInstalling, setIsInstalling] = useState(false);
   const [installedSuccess, setInstalledSuccess] = useState(false);
 
-  // If already installed or dismissed, do NOT show on home page
-  if (isInstalled || dismissed) return null;
+  // If running inside Android APK, or already installed, or dismissed -> NEVER SHOW
+  if (isNativeAndroidApp() || isInstalled || dismissed) return null;
 
   const handleInstallClick = async () => {
     setIsInstalling(true);

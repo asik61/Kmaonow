@@ -168,9 +168,44 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Task edit state
   const [editingTask, setEditingTask] = useState<Partial<TaskItem> | null>(null);
+  const [rewardAmountInput, setRewardAmountInput] = useState<string>('10');
   const [taskSearch, setTaskSearch] = useState('');
   const [taskFilter, setTaskFilter] = useState<'all' | 'active' | 'paused'>('all');
   const [newStepText, setNewStepText] = useState('');
+
+  const handleOpenCreateTask = () => {
+    setEditingTask({
+      title: '',
+      subtitle: 'Install & Register',
+      description: 'Complete registration with mobile number and upload screenshot.',
+      category: 'Register',
+      reward_amount: 10,
+      partner_url: 'https://play.google.com',
+      icon_label: 'NEW',
+      icon_bg: '#059669',
+      image_url: '',
+      instructions: [
+        'Install the app via given button link.',
+        'Register with your active mobile number.',
+        'Take a screenshot of the home screen and submit proof.',
+      ],
+      is_active: true,
+      is_top_offer: true,
+      is_trending: false,
+    });
+    setRewardAmountInput('10');
+    setNewStepText('');
+  };
+
+  const handleOpenEditTask = (task: TaskItem) => {
+    setEditingTask(task);
+    setRewardAmountInput(
+      task.reward_amount !== undefined && task.reward_amount !== null
+        ? String(task.reward_amount)
+        : '10'
+    );
+    setNewStepText('');
+  };
 
   // Notice edit state
   const [editingNotice, setEditingNotice] = useState<Partial<BroadcastNotice> | null>(null);
@@ -375,27 +410,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setEditingTask({
-                      title: '',
-                      subtitle: 'Install & Register',
-                      description: 'Complete registration with mobile number and upload screenshot.',
-                      category: 'Register',
-                      reward_amount: 50.0,
-                      partner_url: 'https://play.google.com',
-                      icon_label: 'NEW',
-                      icon_bg: '#059669',
-                      image_url: '',
-                      instructions: [
-                        'Install the app via given button link.',
-                        'Register with your active mobile number.',
-                        'Take a screenshot of the home screen and submit proof.',
-                      ],
-                      is_active: true,
-                      is_top_offer: true,
-                      is_trending: false,
-                    })
-                  }
+                  onClick={handleOpenCreateTask}
                   className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-98 shrink-0"
                 >
                   <Plus className="w-4 h-4 stroke-[3]" />
@@ -492,15 +507,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     {/* Reward Amount */}
                     <div>
-                      <label className="text-slate-300 font-bold">Reward (₹ INR Payout) *</label>
-                      <input
-                        type="number"
-                        value={editingTask.reward_amount || 50}
-                        onChange={(e) =>
-                          setEditingTask({ ...editingTask, reward_amount: Number(e.target.value) })
-                        }
-                        className="w-full mt-1 px-3 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 font-mono text-emerald-400 font-black text-sm"
-                      />
+                      <div className="flex items-center justify-between">
+                        <label className="text-slate-300 font-bold">Reward (₹ INR Payout) *</label>
+                        <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                          ₹{Number(rewardAmountInput || 0).toFixed(0)} Payout
+                        </span>
+                      </div>
+                      <div className="relative mt-1">
+                        <span className="absolute left-3 top-2.5 text-emerald-400 font-bold text-sm">₹</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="any"
+                          value={rewardAmountInput}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setRewardAmountInput(val);
+                            const num = parseFloat(val);
+                            setEditingTask((prev) =>
+                              prev ? { ...prev, reward_amount: isNaN(num) ? 0 : num } : null
+                            );
+                          }}
+                          placeholder="Type amount (e.g. 10)"
+                          className="w-full pl-7 pr-3 py-2 rounded-xl bg-slate-900 border border-emerald-500/40 font-mono text-emerald-400 font-black text-sm focus:border-emerald-400 focus:outline-none"
+                        />
+                      </div>
+                      {/* Quick preset chips for rapid 1-tap selection */}
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <span className="text-[10px] text-slate-400">Quick set:</span>
+                        {[5, 10, 15, 20, 25, 50, 100].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => {
+                              setRewardAmountInput(String(amt));
+                              setEditingTask((prev) => (prev ? { ...prev, reward_amount: amt } : null));
+                            }}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                              rewardAmountInput === String(amt)
+                                ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                            }`}
+                          >
+                            ₹{amt}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Category */}
@@ -702,7 +754,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                         <div className="flex items-center gap-2.5 shrink-0">
                           <span className="font-mono font-black text-emerald-600 text-base">
-                            ₹{Number(editingTask.reward_amount || 50).toFixed(0)}
+                            ₹{Number(rewardAmountInput || editingTask.reward_amount || 0).toFixed(0)}
                           </span>
                           <button
                             type="button"
@@ -835,7 +887,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           alert('Kripya offer title daalein!');
                           return;
                         }
-                        onSaveTask(editingTask);
+                        const parsedReward = parseFloat(rewardAmountInput);
+                        const finalReward =
+                          !isNaN(parsedReward) && parsedReward > 0
+                            ? parsedReward
+                            : editingTask.reward_amount || 10;
+                        onSaveTask({
+                          ...editingTask,
+                          reward_amount: finalReward,
+                        });
                         setEditingTask(null);
                       }}
                       className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs cursor-pointer shadow-md"
@@ -929,7 +989,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         {/* Edit Button */}
                         <button
                           type="button"
-                          onClick={() => setEditingTask(t)}
+                          onClick={() => handleOpenEditTask(t)}
                           className="px-3 py-1.5 rounded-xl border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20 font-bold text-xs flex items-center gap-1 cursor-pointer"
                         >
                           <Edit3 className="w-3.5 h-3.5" />

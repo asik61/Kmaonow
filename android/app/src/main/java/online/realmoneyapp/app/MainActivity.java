@@ -86,11 +86,23 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setSupportZoom(false);
         webSettings.setDisplayZoomControls(false);
 
-        // Standalone user agent to notify frontend that it's the official APK
+        // Sanitize User-Agent to allow Google OAuth without "disallowed_useragent" (Error 403)
         String defaultUserAgent = webSettings.getUserAgentString();
-        webSettings.setUserAgentString(defaultUserAgent + " RealMoneyApp/1.0.0 (Android APK; Standalone)");
+        String sanitizedUA = defaultUserAgent
+                .replace("; wv", "")
+                .replaceAll("Version/\\d+\\.\\d+\\s*", "")
+                + " RealMoneyApp/1.0.0 (Android APK; Standalone)";
+        webSettings.setUserAgentString(sanitizedUA);
 
+        // Enable popup / multi-window support for Google Sign-In
+        webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+        webSettings.setSupportMultipleWindows(true);
+
+        // Accept Cookies and Third-Party Cookies for OAuth sessions
+        android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(webView, true);
             webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
 
@@ -123,8 +135,14 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
-                // If link belongs to realmoneyapp.online, load inside WebView
-                if (url.contains("realmoneyapp.online") || url.contains("asia-east1.run.app") || url.contains("localhost")) {
+                // If link belongs to realmoneyapp, or Google / Firebase OAuth, keep inside WebView!
+                if (url.contains("realmoneyapp.online") || 
+                    url.contains("asia-east1.run.app") || 
+                    url.contains("localhost") ||
+                    url.contains("accounts.google.com") ||
+                    url.contains("firebaseapp.com") ||
+                    url.contains("apis.google.com") ||
+                    url.contains("google.com/recaptcha")) {
                     return false;
                 }
 
@@ -161,6 +179,49 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
                 callback.invoke(origin, true, false);
+            }
+
+            // Support Google Auth popups inside modal dialog
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                WebView newWebView = new WebView(MainActivity.this);
+                WebSettings newSettings = newWebView.getSettings();
+                newSettings.setJavaScriptEnabled(true);
+                newSettings.setDomStorageEnabled(true);
+                newSettings.setUserAgentString(sanitizedUA);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(newWebView, true);
+                }
+
+                final android.app.Dialog authDialog = new android.app.Dialog(MainActivity.this, android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen);
+                authDialog.setContentView(newWebView);
+                authDialog.show();
+
+                newWebView.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public void onCloseWindow(WebView window) {
+                        authDialog.dismiss();
+                        window.destroy();
+                    }
+                });
+
+                newWebView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
+                        String u = req.getUrl().toString();
+                        if (u.contains("realmoneyapp.online") || u.contains("asia-east1.run.app") || u.contains("localhost")) {
+                            authDialog.dismiss();
+                            webView.loadUrl(u);
+                            return true;
+                        }
+                        return false;
+                    }
+                });
+
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(newWebView);
+                resultMsg.sendToTarget();
+                return true;
             }
 
             // File Chooser for task screenshot proof uploads

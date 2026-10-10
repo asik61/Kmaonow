@@ -158,6 +158,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // App ke apne URLs — WebView mein hi rakho
                 if (url.contains("realmoneyapp.online") ||
+                    url.contains("kmaonow") ||
                     url.contains("asia-east1.run.app") ||
                     url.contains("localhost") ||
                     url.contains("apis.google.com") ||
@@ -222,6 +223,7 @@ public class MainActivity extends AppCompatActivity {
                     public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
                         String u = req.getUrl().toString();
                         if (u.contains("realmoneyapp.online") ||
+                            u.contains("kmaonow") ||
                             u.contains("asia-east1.run.app") ||
                             u.contains("localhost")) {
                             authDialog.dismiss();

@@ -129,6 +129,10 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     try {
       // Direct Firebase Google Auth with native account chooser
       const result = await loginWithFirebaseGoogle();
+      if (!result) {
+        // Redirect initiated for browser if popup was blocked
+        return;
+      }
       await finalizeGoogleLogin({
         uid: result.uid,
         name: result.name,

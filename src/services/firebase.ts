@@ -1,5 +1,12 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut as fbSignOut,
+} from 'firebase/auth';
 import {
   getFirestore,
   doc,
@@ -214,23 +221,89 @@ export async function fetchAllSubmissions(): Promise<any[]> {
   }
 }
 
+// APK Detection Helper
+export const isRunningInAPK = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return (
+    navigator.userAgent.includes('RealMoneyApp') ||
+    new URLSearchParams(window.location.search).get('source') === 'apk'
+  );
+};
+
+// Check if returning from a browser redirect sign-in flow
+export async function checkFirebaseRedirectResult(): Promise<{
+  uid: string;
+  name: string;
+  email: string;
+  photoURL: string;
+} | null> {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      const user = result.user;
+      return {
+        uid: user.uid,
+        name: user.displayName || 'Google User',
+        email: user.email || '',
+        photoURL:
+          user.photoURL ||
+          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+      };
+    }
+  } catch (err) {
+    console.warn('Firebase getRedirectResult check:', err);
+  }
+  return null;
+}
+
 // Real Firebase Google Login trigger
+// FIX 1: In APK WebView, ALWAYS use signInWithPopup because signInWithRedirect
+// fails with "missing initial state" when sessionStorage gets cleared on redirect.
 export async function loginWithFirebaseGoogle(): Promise<{
   uid: string;
   name: string;
   email: string;
   photoURL: string;
-}> {
-  const result = await signInWithPopup(auth, googleProvider);
-  const user = result.user;
-  return {
-    uid: user.uid,
-    name: user.displayName || 'Google User',
-    email: user.email || '',
-    photoURL:
-      user.photoURL ||
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-  };
+} | null> {
+  const isAPK = isRunningInAPK();
+
+  if (isAPK) {
+    // In APK: signInWithPopup is handled cleanly by MainActivity.java WebChromeClient onCreateWindow
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
+    return {
+      uid: user.uid,
+      name: user.displayName || 'Google User',
+      email: user.email || '',
+      photoURL:
+        user.photoURL ||
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+    };
+  } else {
+    // In Browser and PWA: try popup; if popup is blocked, fall back to redirect
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      return {
+        uid: user.uid,
+        name: user.displayName || 'Google User',
+        email: user.email || '',
+        photoURL:
+          user.photoURL ||
+          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+      };
+    } catch (popupErr: any) {
+      if (
+        popupErr?.code === 'auth/popup-blocked' ||
+        popupErr?.code === 'auth/cancelled-popup-request'
+      ) {
+        console.info('Popup blocked in browser, falling back to signInWithRedirect...');
+        await signInWithRedirect(auth, googleProvider);
+        return null;
+      }
+      throw popupErr;
+    }
+  }
 }
 
 export async function logoutFromFirebase(): Promise<void> {

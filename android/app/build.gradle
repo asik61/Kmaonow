@@ -18,28 +18,17 @@ android {
 
     signingConfigs {
         release {
-            if (file('../../release.keystore').exists()) {
-                storeFile file('../../release.keystore')
-                storePassword 'realmoney123'
-                keyAlias 'realmoney'
-                keyPassword 'realmoney123'
-            } else if (file('../release.keystore').exists()) {
-                storeFile file('../release.keystore')
-                storePassword 'realmoney123'
-                keyAlias 'realmoney'
-                keyPassword 'realmoney123'
-            }
+            storeFile file('../release.keystore')
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "realmoney123"
+            keyAlias System.getenv("KEY_ALIAS") ?: "realmoney"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "realmoney123"
         }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            if (file('../../release.keystore').exists() || file('../release.keystore').exists()) {
-                signingConfig signingConfigs.release
-            } else {
-                signingConfig signingConfigs.debug
-            }
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {

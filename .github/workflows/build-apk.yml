@@ -26,34 +26,43 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Generate Release Keystore
+      - name: Decode Keystore from Secret
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/release.keystore
+          else
+            echo "KEYSTORE_BASE64 secret not found, generating default release.keystore..."
+            cd android
+            keytool -genkeypair -v \
+              -keystore release.keystore \
+              -alias realmoney \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass realmoney123 -keypass realmoney123 \
+              -dname "CN=Real Money App, OU=Mobile, O=RealMoneyApp, L=Mumbai, ST=Maharashtra, C=IN"
+          fi
+
+      - name: Build Signed Release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           cd android
-          keytool -genkeypair -v \
-            -keystore release.keystore \
-            -alias realmoney \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass realmoney123 \
-            -keypass realmoney123 \
-            -dname "CN=Real Money App, OU=Mobile, O=RealMoneyApp, L=Mumbai, ST=Maharashtra, C=IN"
+          gradle assembleRelease --no-daemon --stacktrace
 
-      - name: Build Android APKs (Release & Debug)
+      - name: Build Debug APK
         run: |
           cd android
-          gradle assembleRelease assembleDebug --no-daemon --stacktrace
+          gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Prepare APKs for Download
+      - name: Prepare APKs
         run: |
           mkdir -p final-apks
-          # Copy release APK
           cp android/app/build/outputs/apk/release/*.apk final-apks/RealMoneyApp-release.apk || true
-          # Copy debug APK
           cp android/app/build/outputs/apk/debug/*.apk final-apks/RealMoneyApp-debug.apk || true
           ls -la final-apks/
 
-      - name: Upload Ready APK Files
+      - name: Upload APK Files
         uses: actions/upload-artifact@v4
         with:
           name: RealMoneyApp-Android-APKs

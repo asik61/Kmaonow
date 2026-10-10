@@ -88,6 +88,7 @@ import {
   syncTaskToFirestore,
   fetchTasksFromFirestore,
   deleteTaskFromFirestore,
+  checkFirebaseRedirectResult,
 } from './services/firebase';
 import { NotificationModal } from './components/NotificationModal';
 import { RulesModal } from './components/RulesModal';
@@ -96,6 +97,7 @@ import {
   INITIAL_NOTIFICATIONS,
   sendOutPushNotification,
 } from './services/notifications';
+import { showInterstitialAd, showBannerAd } from './services/adManager';
 
 type NavTab = 'home' | 'tasks' | 'spin' | 'scratch' | 'profile' | 'offers' | 'refer' | 'daily' | 'withdraw';
 
@@ -394,6 +396,26 @@ export default function App() {
   // Sync state to localStorage, purge legacy demo data, & fetch real data from API
   useEffect(() => {
     testConnection().catch(console.warn);
+    showBannerAd();
+
+    // Handle return from browser Google Redirect login
+    checkFirebaseRedirectResult().then((gUser) => {
+      if (gUser) {
+        handleLoginSuccess({
+          id: `usr-${gUser.uid}`,
+          name: gUser.name,
+          email: gUser.email,
+          phone: '',
+          referral_code: `RM${Math.floor(1000 + Math.random() * 9000)}`,
+          referred_by: null,
+          is_blocked: false,
+          is_verified: true,
+          role: gUser.email.toLowerCase() === 'asik94906@gmail.com' ? 'admin' : 'user',
+          avatar_url: gUser.photoURL,
+          created_at: new Date().toISOString(),
+        }, false);
+      }
+    }).catch(console.warn);
 
     // One-time purge of legacy demo / mock data
     const PURGE_KEY = 'realmoney_v20_purge_all_demo_data';
@@ -747,6 +769,9 @@ export default function App() {
     sendOutPushNotification('Real Money App 📸', {
       body: `Screenshot received for ${targetTask.title}! Admin review me hai.`,
     }).catch(console.warn);
+
+    // FIX 5: AdMob Interstitial ad on APK
+    showInterstitialAd();
 
     showToast(`Screenshot submit ho gaya! ₹${targetTask.reward_amount.toFixed(2)} under review hai. 🎉`);
   };

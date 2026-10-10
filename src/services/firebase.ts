@@ -271,18 +271,19 @@ export async function loginWithFirebaseGoogle(): Promise<{
   ) {
     return new Promise((resolve, reject) => {
       // Set one-time success callback
-      (window as any).onNativeGoogleLoginSuccess = (account: {
-        uid: string;
-        name: string;
-        email: string;
-        photoURL?: string;
-      }) => {
+      (window as any).onNativeGoogleLoginSuccess = (account: any) => {
+        let acc = account;
+        if (typeof acc === 'string') {
+          try {
+            acc = JSON.parse(acc);
+          } catch {}
+        }
         resolve({
-          uid: account.uid || `usr-${Date.now()}`,
-          name: account.name || 'Google User',
-          email: account.email || '',
+          uid: acc?.uid || `usr-${Date.now()}`,
+          name: acc?.name || 'Google User',
+          email: acc?.email || '',
           photoURL:
-            account.photoURL ||
+            acc?.photoURL ||
             'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
         });
       };

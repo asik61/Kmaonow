@@ -3,12 +3,13 @@ package online.realmoneyapp.app;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -20,18 +21,30 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.tasks.Task;
+
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final String TAG = "RealMoneyApp";
     private static final String APP_URL = "https://realmoneyapp.online/?source=apk";
+
     private WebView webView;
     private SwipeRefreshLayout swipeRefresh;
     private ValueCallback<Uri[]> filePathCallback;
+    private GoogleSignInClient googleSignInClient;
     private long backPressedTime = 0;
     private String sanitizedUA;
 
+    // File Chooser Launcher (Screenshot / Document Upload)
     private final ActivityResultLauncher<Intent> fileChooserLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -54,6 +67,47 @@ public class MainActivity extends AppCompatActivity {
             }
     );
 
+    // Native Google Account Chooser Launcher ("Choose Wala")
+    private final ActivityResultLauncher<Intent> googleSignInLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
+                    try {
+                        GoogleSignInAccount account = task.getResult(ApiException.class);
+                        if (account != null) {
+                            String uid = account.getId() != null ? account.getId() : ("g_" + System.currentTimeMillis());
+                            String name = account.getDisplayName() != null ? account.getDisplayName() : "Google User";
+                            String email = account.getEmail() != null ? account.getEmail() : "";
+                            String photo = account.getPhotoUrl() != null ? account.getPhotoUrl().toString() : "";
+
+                            JSONObject json = new JSONObject();
+                            json.put("uid", uid);
+                            json.put("name", name);
+                            json.put("email", email);
+                            json.put("photoURL", photo);
+
+                            final String jsCallback = "if (window.onNativeGoogleLoginSuccess) { window.onNativeGoogleLoginSuccess(" + json.toString() + "); }";
+                            webView.post(() -> webView.evaluateJavascript(jsCallback, null));
+                            return;
+                        }
+                    } catch (ApiException e) {
+                        Log.e(TAG, "Google Sign-In failed: " + e.getStatusCode(), e);
+                        String errMsg = (e.getStatusCode() == 12501)
+                                ? "Google login cancelled"
+                                : "Google login failed: " + e.getStatusCode();
+                        final String jsErr = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('" + errMsg + "'); }";
+                        webView.post(() -> webView.evaluateJavascript(jsErr, null));
+                        return;
+                    } catch (Exception e) {
+                        Log.e(TAG, "Google Sign-In parsing error", e);
+                    }
+                }
+                final String jsCancel = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('Login cancelled'); }";
+                webView.post(() -> webView.evaluateJavascript(jsCancel, null));
+            }
+    );
+
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,12 +123,25 @@ public class MainActivity extends AppCompatActivity {
             webView.reload();
         });
 
+        initGoogleSignIn();
         setupWebView();
 
         if (savedInstanceState == null) {
             webView.loadUrl(APP_URL);
         } else {
             webView.restoreState(savedInstanceState);
+        }
+    }
+
+    private void initGoogleSignIn() {
+        try {
+            GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestEmail()
+                    .requestProfile()
+                    .build();
+            googleSignInClient = GoogleSignIn.getClient(this, gso);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize GoogleSignInClient", e);
         }
     }
 
@@ -109,6 +176,9 @@ public class MainActivity extends AppCompatActivity {
             webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
 
+        // Bridge for Native Android Google Sign-In & Toast
+        webView.addJavascriptInterface(new WebAppInterface(), "AndroidBridge");
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -123,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
             private boolean handleUrl(String url) {
                 if (url == null) return false;
 
-                // UPI, WhatsApp, phone calls — system app mein kholo
+                // Native app protocols: UPI, WhatsApp, dialer, mail, Play Store
                 if (url.startsWith("upi://") || url.startsWith("whatsapp://") ||
                     url.startsWith("intent://") || url.startsWith("tel:") ||
                     url.startsWith("mailto:") || url.startsWith("market://")) {
@@ -136,37 +206,18 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
-                // ✅ FIX: Google OAuth ko Chrome Custom Tab mein kholo (WebView mein nahi)
-                // Google ne WebView mein OAuth block kar diya hai — Chrome Tab zaroori hai
-                if (url.contains("accounts.google.com") ||
-                    url.contains("/__/auth/handler") ||
-                    url.contains("firebaseapp.com/__/auth")) {
-                    try {
-                        CustomTabsIntent customTab = new CustomTabsIntent.Builder()
-                                .setShowTitle(false)
-                                .build();
-                        customTab.launchUrl(MainActivity.this, Uri.parse(url));
-                        return true;
-                    } catch (Exception e) {
-                        // Chrome nahi hai toh default browser mein kholo
-                        try {
-                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                        } catch (Exception ignored) {}
-                        return true;
-                    }
-                }
-
-                // App ke apne URLs — WebView mein hi rakho
+                // App domains stay strictly inside WebView
                 if (url.contains("realmoneyapp.online") ||
                     url.contains("kmaonow") ||
                     url.contains("asia-east1.run.app") ||
                     url.contains("localhost") ||
+                    url.contains("127.0.0.1") ||
                     url.contains("apis.google.com") ||
                     url.contains("google.com/recaptcha")) {
                     return false;
                 }
 
-                // Baaki sab external links — browser mein kholo
+                // External URLs (ad partners, external surveys) open in default browser
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                     return true;
@@ -257,6 +308,48 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
+    }
+
+    // JavaScript Interface to Bridge Native Android Features to Web App
+    public class WebAppInterface {
+        @JavascriptInterface
+        public void loginWithGoogle() {
+            runOnUiThread(() -> {
+                try {
+                    if (googleSignInClient != null) {
+                        // Sign out previously chosen account so the user is ALWAYS prompted
+                        // with the account selection bottom-sheet ("choose wala")
+                        googleSignInClient.signOut().addOnCompleteListener(task -> {
+                            Intent signInIntent = googleSignInClient.getSignInIntent();
+                            googleSignInLauncher.launch(signInIntent);
+                        });
+                    } else {
+                        initGoogleSignIn();
+                        if (googleSignInClient != null) {
+                            Intent signInIntent = googleSignInClient.getSignInIntent();
+                            googleSignInLauncher.launch(signInIntent);
+                        } else {
+                            final String jsErr = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('Google Sign-In unavailable'); }";
+                            webView.evaluateJavascript(jsErr, null);
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error launching Google Sign-In", e);
+                    final String jsErr = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('Error launching Google Sign-In'); }";
+                    webView.evaluateJavascript(jsErr, null);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean isNativeApp() {
+            return true;
+        }
+
+        @JavascriptInterface
+        public void showToast(String message) {
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show());
+        }
     }
 
     @Override

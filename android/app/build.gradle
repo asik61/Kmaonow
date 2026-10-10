@@ -1,0 +1,62 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'online.realmoneyapp.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "online.realmoneyapp.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            if (file('../../release.keystore').exists()) {
+                storeFile file('../../release.keystore')
+                storePassword 'realmoney123'
+                keyAlias 'realmoney'
+                keyPassword 'realmoney123'
+            } else if (file('../release.keystore').exists()) {
+                storeFile file('../release.keystore')
+                storePassword 'realmoney123'
+                keyAlias 'realmoney'
+                keyPassword 'realmoney123'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (file('../../release.keystore').exists() || file('../release.keystore').exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.webkit:webkit:1.10.0'
+}

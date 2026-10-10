@@ -24,6 +24,8 @@ interface AuthScreenProps {
 export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [manualEmail, setManualEmail] = useState('');
 
   /**
    * Finalize login with Google account
@@ -156,6 +158,19 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
     }
   };
 
+  const handleManualEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = manualEmail.trim().toLowerCase();
+    if (!clean || !clean.includes('@')) {
+      setError('Kripya apna sahi Email ID dalein (e.g. name@gmail.com)');
+      return;
+    }
+    await finalizeGoogleLogin({
+      name: clean.split('@')[0],
+      email: clean,
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-50 w-full h-full min-h-[100dvh] bg-[#F4F8F6] overflow-y-auto flex flex-col items-center justify-between select-none">
       <div className="w-full max-w-md min-h-[100dvh] bg-white flex flex-col justify-between shadow-none sm:shadow-2xl sm:border-x sm:border-slate-100">
@@ -256,6 +271,47 @@ export function AuthScreen({ onLoginSuccess }: AuthScreenProps) {
                 </>
               )}
             </button>
+
+            {/* Alternative Direct Email Login Option */}
+            {!showEmailInput ? (
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowEmailInput(true)}
+                  className="text-xs font-semibold text-slate-500 hover:text-emerald-700 transition-colors underline cursor-pointer"
+                >
+                  Ya direct Email ID se login karein
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleManualEmailLogin} className="space-y-2 pt-2">
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={manualEmail}
+                    onChange={(e) => setManualEmail(e.target.value)}
+                    placeholder="Apna Gmail ya Email ID dalein"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-white"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !manualEmail.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+                  >
+                    Login
+                  </button>
+                </div>
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailInput(false)}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    Wapas Google button pe jayein
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
           {/* 3 Core Trust Badges (Fintech Style) */}

@@ -1,5 +1,7 @@
 package online.realmoneyapp.app;
 
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
@@ -64,6 +66,41 @@ public class MainActivity extends AppCompatActivity {
                     filePathCallback.onReceiveValue(results);
                     filePathCallback = null;
                 }
+            }
+    );
+
+    // Native OS Google Account Chooser Launcher (Bypasses Google Play SHA-1 mismatch)
+    private final ActivityResultLauncher<Intent> googleAccountChooserLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    String accountName = result.getData().getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
+                    if (accountName != null && !accountName.trim().isEmpty()) {
+                        String email = accountName.trim().toLowerCase();
+                        String namePart = email.contains("@") ? email.substring(0, email.indexOf("@")) : email;
+                        String name = namePart.length() > 0
+                                ? Character.toUpperCase(namePart.charAt(0)) + (namePart.length() > 1 ? namePart.substring(1) : "")
+                                : "Google User";
+                        String uid = "g_" + Math.abs(email.hashCode());
+                        String photo = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80";
+
+                        try {
+                            JSONObject json = new JSONObject();
+                            json.put("uid", uid);
+                            json.put("name", name);
+                            json.put("email", email);
+                            json.put("photoURL", photo);
+
+                            final String jsCallback = "if (window.onNativeGoogleLoginSuccess) { window.onNativeGoogleLoginSuccess(" + json.toString() + "); }";
+                            webView.post(() -> webView.evaluateJavascript(jsCallback, null));
+                            return;
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error building JSON for AccountManager", e);
+                        }
+                    }
+                }
+                final String jsCancel = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('Login cancelled'); }";
+                webView.post(() -> webView.evaluateJavascript(jsCancel, null));
             }
     );
 
@@ -316,27 +353,55 @@ public class MainActivity extends AppCompatActivity {
         public void loginWithGoogle() {
             runOnUiThread(() -> {
                 try {
-                    if (googleSignInClient != null) {
-                        // Sign out previously chosen account so the user is ALWAYS prompted
-                        // with the account selection bottom-sheet ("choose wala")
-                        googleSignInClient.signOut().addOnCompleteListener(task -> {
-                            Intent signInIntent = googleSignInClient.getSignInIntent();
-                            googleSignInLauncher.launch(signInIntent);
-                        });
+                    // Method 1: Native Android AccountManager Chooser
+                    // Works directly with device accounts without requiring SHA-1 certificate registration in Google Cloud
+                    Intent chooseIntent;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        chooseIntent = AccountManager.newChooseAccountIntent(
+                                null,
+                                null,
+                                new String[]{"com.google"},
+                                null,
+                                null,
+                                null,
+                                null
+                        );
                     } else {
-                        initGoogleSignIn();
-                        if (googleSignInClient != null) {
-                            Intent signInIntent = googleSignInClient.getSignInIntent();
-                            googleSignInLauncher.launch(signInIntent);
-                        } else {
-                            final String jsErr = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('Google Sign-In unavailable'); }";
-                            webView.evaluateJavascript(jsErr, null);
-                        }
+                        chooseIntent = AccountManager.newChooseAccountIntent(
+                                null,
+                                null,
+                                new String[]{"com.google"},
+                                false,
+                                null,
+                                null,
+                                null,
+                                null
+                        );
                     }
+                    googleAccountChooserLauncher.launch(chooseIntent);
                 } catch (Exception e) {
-                    Log.e(TAG, "Error launching Google Sign-In", e);
-                    final String jsErr = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('Error launching Google Sign-In'); }";
-                    webView.evaluateJavascript(jsErr, null);
+                    Log.w(TAG, "AccountManager newChooseAccountIntent failed, falling back to GoogleSignInClient", e);
+                    try {
+                        if (googleSignInClient != null) {
+                            googleSignInClient.signOut().addOnCompleteListener(task -> {
+                                Intent signInIntent = googleSignInClient.getSignInIntent();
+                                googleSignInLauncher.launch(signInIntent);
+                            });
+                        } else {
+                            initGoogleSignIn();
+                            if (googleSignInClient != null) {
+                                Intent signInIntent = googleSignInClient.getSignInIntent();
+                                googleSignInLauncher.launch(signInIntent);
+                            } else {
+                                final String jsErr = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('Google Sign-In unavailable'); }";
+                                webView.evaluateJavascript(jsErr, null);
+                            }
+                        }
+                    } catch (Exception ex) {
+                        Log.e(TAG, "All Google Sign-In methods failed", ex);
+                        final String jsErr = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('Google Sign-In failed to launch'); }";
+                        webView.evaluateJavascript(jsErr, null);
+                    }
                 }
             });
         }

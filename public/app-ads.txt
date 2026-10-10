@@ -1,0 +1,3 @@
+# Google AdMob app-ads.txt for Real Money App (realmoneyapp.online)
+# Replace pub-XXXXXXXXXXXXXXXX with your actual Google AdMob Publisher ID from admob.google.com > Settings > Account Information
+google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0

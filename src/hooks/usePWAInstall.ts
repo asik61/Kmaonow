@@ -12,16 +12,38 @@ declare global {
   }
 }
 
-// Check if currently running in standalone installed mode
+// Check if currently running in standalone installed mode (PWA, TWA, or native Android APK)
 export const checkIsPWAInstalled = (): boolean => {
   if (typeof window === 'undefined') return false;
 
-  const isStandaloneMatch = window.matchMedia('(display-mode: standalone)').matches;
+  const isStandaloneMatch =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.matchMedia('(display-mode: minimal-ui)').matches;
+
   const isIOSStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-  const isUrlPWA = window.location.search.includes('source=pwa') || window.location.hash.includes('source=pwa');
+
+  // Check URL parameters commonly set by PWA / TWA (PWABuilder / Bubblewrap sets ?source=pwa or ?utm_source=twa)
+  const search = window.location.search.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  const isUrlPWA =
+    search.includes('source=pwa') ||
+    search.includes('utm_source=twa') ||
+    search.includes('source=apk') ||
+    search.includes('android-app') ||
+    hash.includes('source=pwa');
+
+  // Check if running inside Android TWA / WebView
+  const ua = (window.navigator.userAgent || '').toLowerCase();
+  const isAndroidApp =
+    ua.includes('wv') || // Android WebView indicator
+    ua.includes('bubblewrap') ||
+    ua.includes('twa') ||
+    document.referrer.includes('android-app://');
+
   const isStorageMarked = localStorage.getItem('pwa_app_installed') === 'true';
 
-  if (isStandaloneMatch || isIOSStandalone || isUrlPWA) {
+  if (isStandaloneMatch || isIOSStandalone || isUrlPWA || isAndroidApp) {
     localStorage.setItem('pwa_app_installed', 'true');
     return true;
   }

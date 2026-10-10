@@ -2675,6 +2675,23 @@ export default function App() {
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
 
+              {/* Privacy Policy & Terms (Mandatory for Amazon Appstore & AdMob Approval) */}
+              <a
+                href="/privacy-policy.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer text-left block"
+              >
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <div>
+                    <span className="font-bold text-slate-900 block">Privacy Policy &amp; Terms</span>
+                    <span className="text-[10px] text-slate-400">Store compliance &amp; user data protection</span>
+                  </div>
+                </div>
+                <ExternalLink className="w-4 h-4 text-slate-400" />
+              </a>
+
               {/* Master Admin ONLY: Operations Desk & Reset Seed */}
               {isMasterAdmin && (
                 <>

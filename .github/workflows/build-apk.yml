@@ -1,0 +1,51 @@
+name: Build Android APK (TWA Bubblewrap)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    name: Build Signed Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Create Bubblewrap Configuration & Generate APK
+        run: |
+          mkdir -p android-build
+          cd android-build
+          
+          # Initialize twa-manifest directly for realmoneyapp.online
+          bubblewrap init --manifest=https://realmoneyapp.online/manifest.json --skip-signing-key
+
+          # Build release/debug APK
+          bubblewrap build
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RealMoneyApp-Android-APK
+          path: android-build/*.apk
+          retention-days: 30

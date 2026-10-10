@@ -41,7 +41,6 @@ public class MainActivity extends AppCompatActivity {
     private SwipeRefreshLayout swipeRefresh;
     private ValueCallback<Uri[]> filePathCallback;
     private long backPressedTime = 0;
-    private boolean isIdTokenAttempt = true;
 
     // File Chooser for task screenshot proofs
     private final ActivityResultLauncher<Intent> fileChooserLauncher = registerForActivityResult(
@@ -253,32 +252,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startGoogleSignIn() {
-        isIdTokenAttempt = true;
-        GoogleSignInOptions.Builder gsoBuilder = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestEmail()
-                .requestProfile();
-
-        try {
-            gsoBuilder.requestIdToken(OAUTH_CLIENT_ID);
-        } catch (Exception ignored) {}
-
-        GoogleSignInClient client = GoogleSignIn.getClient(this, gsoBuilder.build());
-        // Explicitly signOut first so that the Account Chooser dialog ALWAYS shows
-        // with all the user's Gmail accounts on the device ("choose wala")
-        client.signOut().addOnCompleteListener(this, task -> {
-            Intent intent = client.getSignInIntent();
-            googleSignInLauncher.launch(intent);
-        });
-    }
-
-    private void startBasicGoogleSignIn() {
-        isIdTokenAttempt = false;
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .requestProfile()
                 .build();
 
         GoogleSignInClient client = GoogleSignIn.getClient(this, gso);
+        // Explicitly signOut first so that the Account Chooser dialog ALWAYS shows
+        // with all the user's Gmail accounts on the device ("choose wala")
         client.signOut().addOnCompleteListener(this, task -> {
             Intent intent = client.getSignInIntent();
             googleSignInLauncher.launch(intent);
@@ -305,14 +286,10 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (ApiException e) {
             int statusCode = e.getStatusCode();
-            // If ID Token verification failed (e.g. SHA-1 not yet linked in Google Cloud / Firebase console),
-            // gracefully fallback to basic Google Sign-in to still get the account name/email/photo!
-            if ((statusCode == 10 || statusCode == 12500) && isIdTokenAttempt) {
-                startBasicGoogleSignIn();
-            } else if (statusCode == 12501) {
+            if (statusCode == 12501) {
                 notifyGoogleSignInError("Account selection cancelled");
             } else {
-                notifyGoogleSignInError("Google sign-in status code: " + statusCode);
+                notifyGoogleSignInError("Google sign-in error (" + statusCode + ")");
             }
         } catch (Exception e) {
             notifyGoogleSignInError(e.getMessage());

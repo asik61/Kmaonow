@@ -9,7 +9,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.webkit.GeolocationPermissions;
-import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -21,28 +20,18 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.auth.api.signin.GoogleSignInClient;
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.tasks.Task;
-
-import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String APP_URL = "https://realmoneyapp.online/?source=apk";
-    private static final String OAUTH_CLIENT_ID = "599315886709-1ktv1koo6iop8ga7np95f2l911504hqb.apps.googleusercontent.com";
-
     private WebView webView;
     private SwipeRefreshLayout swipeRefresh;
     private ValueCallback<Uri[]> filePathCallback;
     private long backPressedTime = 0;
+    private String sanitizedUA;
 
-    // File Chooser for task screenshot proofs
     private final ActivityResultLauncher<Intent> fileChooserLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -61,19 +50,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                     filePathCallback.onReceiveValue(results);
                     filePathCallback = null;
-                }
-            }
-    );
-
-    // Native Google Sign-In with Account Chooser ("choose wala")
-    private final ActivityResultLauncher<Intent> googleSignInLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (result.getData() != null) {
-                    Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
-                    handleGoogleSignInResult(task);
-                } else {
-                    notifyGoogleSignInError("Login cancelled by user");
                 }
             }
     );
@@ -116,19 +92,16 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setDisplayZoomControls(false);
         webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
-        // Sanitize User-Agent to allow Google OAuth without "disallowed_useragent" (Error 403)
         String defaultUserAgent = webSettings.getUserAgentString();
-        String sanitizedUA = defaultUserAgent
+        sanitizedUA = defaultUserAgent
                 .replace("; wv", "")
                 .replaceAll("Version/\\d+\\.\\d+\\s*", "")
                 + " RealMoneyApp/1.0.0 (Android APK; Standalone)";
         webSettings.setUserAgentString(sanitizedUA);
 
-        // Enable popup / multi-window support
         webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
         webSettings.setSupportMultipleWindows(true);
 
-        // Accept Cookies and Third-Party Cookies for sessions
         android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -136,14 +109,10 @@ public class MainActivity extends AppCompatActivity {
             webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
 
-        // Add JavaScript Bridge for 1-Tap Native Google Account Chooser
-        webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
-
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                return handleUrl(url);
+                return handleUrl(request.getUrl().toString());
             }
 
             @Override
@@ -154,44 +123,55 @@ public class MainActivity extends AppCompatActivity {
             private boolean handleUrl(String url) {
                 if (url == null) return false;
 
-                // Handle external apps, UPI payments, WhatsApp, Telegram, Phone calls
-                if (url.startsWith("upi://") || url.startsWith("whatsapp://") || 
-                    url.startsWith("intent://") || url.startsWith("tel:") || 
+                // UPI, WhatsApp, phone calls — system app mein kholo
+                if (url.startsWith("upi://") || url.startsWith("whatsapp://") ||
+                    url.startsWith("intent://") || url.startsWith("tel:") ||
                     url.startsWith("mailto:") || url.startsWith("market://")) {
                     try {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                        startActivity(intent);
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                         return true;
                     } catch (ActivityNotFoundException e) {
-                        Toast.makeText(MainActivity.this, "Requested application not found", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "App not found", Toast.LENGTH_SHORT).show();
                         return true;
                     }
                 }
 
-                // If link belongs to realmoneyapp or OAuth, keep inside WebView
-                if (url.contains("realmoneyapp.online") || 
-                    url.contains("asia-east1.run.app") || 
+                // ✅ FIX: Google OAuth ko Chrome Custom Tab mein kholo (WebView mein nahi)
+                // Google ne WebView mein OAuth block kar diya hai — Chrome Tab zaroori hai
+                if (url.contains("accounts.google.com") ||
+                    url.contains("/__/auth/handler") ||
+                    url.contains("firebaseapp.com/__/auth")) {
+                    try {
+                        CustomTabsIntent customTab = new CustomTabsIntent.Builder()
+                                .setShowTitle(false)
+                                .build();
+                        customTab.launchUrl(MainActivity.this, Uri.parse(url));
+                        return true;
+                    } catch (Exception e) {
+                        // Chrome nahi hai toh default browser mein kholo
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                        } catch (Exception ignored) {}
+                        return true;
+                    }
+                }
+
+                // App ke apne URLs — WebView mein hi rakho
+                if (url.contains("realmoneyapp.online") ||
+                    url.contains("asia-east1.run.app") ||
                     url.contains("localhost") ||
-                    url.contains("accounts.google.com") ||
-                    url.contains("firebaseapp.com") ||
                     url.contains("apis.google.com") ||
                     url.contains("google.com/recaptcha")) {
                     return false;
                 }
 
-                // External task/sponsor links open in default mobile browser
+                // Baaki sab external links — browser mein kholo
                 try {
-                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                    startActivity(browserIntent);
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
                     return true;
                 } catch (Exception ignored) {
                     return false;
                 }
-            }
-
-            @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                super.onPageStarted(view, url, favicon);
             }
 
             @Override
@@ -204,9 +184,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
-                if (newProgress == 100) {
-                    swipeRefresh.setRefreshing(false);
-                }
+                if (newProgress == 100) swipeRefresh.setRefreshing(false);
             }
 
             @Override
@@ -214,7 +192,52 @@ public class MainActivity extends AppCompatActivity {
                 callback.invoke(origin, true, false);
             }
 
-            // File Chooser for task screenshot proof uploads
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                WebView newWebView = new WebView(MainActivity.this);
+                WebSettings newSettings = newWebView.getSettings();
+                newSettings.setJavaScriptEnabled(true);
+                newSettings.setDomStorageEnabled(true);
+                newSettings.setUserAgentString(sanitizedUA);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(newWebView, true);
+                }
+
+                final android.app.Dialog authDialog = new android.app.Dialog(
+                        MainActivity.this,
+                        android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen);
+                authDialog.setContentView(newWebView);
+                authDialog.show();
+
+                newWebView.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public void onCloseWindow(WebView window) {
+                        authDialog.dismiss();
+                        window.destroy();
+                    }
+                });
+
+                newWebView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
+                        String u = req.getUrl().toString();
+                        if (u.contains("realmoneyapp.online") ||
+                            u.contains("asia-east1.run.app") ||
+                            u.contains("localhost")) {
+                            authDialog.dismiss();
+                            webView.loadUrl(u);
+                            return true;
+                        }
+                        return false;
+                    }
+                });
+
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(newWebView);
+                resultMsg.sendToTarget();
+                return true;
+            }
+
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback,
                                               FileChooserParams fileChooserParams) {
@@ -222,10 +245,8 @@ public class MainActivity extends AppCompatActivity {
                     MainActivity.this.filePathCallback.onReceiveValue(null);
                 }
                 MainActivity.this.filePathCallback = filePathCallback;
-
-                Intent intent = fileChooserParams.createIntent();
                 try {
-                    fileChooserLauncher.launch(intent);
+                    fileChooserLauncher.launch(fileChooserParams.createIntent());
                 } catch (ActivityNotFoundException e) {
                     MainActivity.this.filePathCallback = null;
                     Toast.makeText(MainActivity.this, "Cannot open file chooser", Toast.LENGTH_SHORT).show();
@@ -234,72 +255,6 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
-    }
-
-    // =========================================================================
-    // Native Google Account Chooser Implementation ("choose wala")
-    // =========================================================================
-    public class AndroidBridge {
-        @JavascriptInterface
-        public void loginWithGoogle() {
-            runOnUiThread(() -> startGoogleSignIn());
-        }
-
-        @JavascriptInterface
-        public boolean isNativeApp() {
-            return true;
-        }
-    }
-
-    private void startGoogleSignIn() {
-        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestEmail()
-                .requestProfile()
-                .build();
-
-        GoogleSignInClient client = GoogleSignIn.getClient(this, gso);
-        // Explicitly signOut first so that the Account Chooser dialog ALWAYS shows
-        // with all the user's Gmail accounts on the device ("choose wala")
-        client.signOut().addOnCompleteListener(this, task -> {
-            Intent intent = client.getSignInIntent();
-            googleSignInLauncher.launch(intent);
-        });
-    }
-
-    private void handleGoogleSignInResult(Task<GoogleSignInAccount> task) {
-        try {
-            GoogleSignInAccount account = task.getResult(ApiException.class);
-            if (account != null) {
-                String uid = account.getId() != null ? account.getId() : ("g-" + System.currentTimeMillis());
-                String name = account.getDisplayName() != null ? account.getDisplayName() : "Google User";
-                String email = account.getEmail() != null ? account.getEmail() : "";
-                String photo = account.getPhotoUrl() != null ? account.getPhotoUrl().toString() : "";
-
-                JSONObject json = new JSONObject();
-                json.put("uid", uid);
-                json.put("name", name);
-                json.put("email", email);
-                json.put("photoURL", photo);
-
-                String script = "if (window.onNativeGoogleLoginSuccess) { window.onNativeGoogleLoginSuccess(" + json.toString() + "); }";
-                runOnUiThread(() -> webView.evaluateJavascript(script, null));
-            }
-        } catch (ApiException e) {
-            int statusCode = e.getStatusCode();
-            if (statusCode == 12501) {
-                notifyGoogleSignInError("Account selection cancelled");
-            } else {
-                notifyGoogleSignInError("Google sign-in error (" + statusCode + ")");
-            }
-        } catch (Exception e) {
-            notifyGoogleSignInError(e.getMessage());
-        }
-    }
-
-    private void notifyGoogleSignInError(String errorMsg) {
-        String safeMsg = (errorMsg != null ? errorMsg.replace("'", "\\'") : "Error");
-        String script = "if (window.onNativeGoogleLoginError) { window.onNativeGoogleLoginError('" + safeMsg + "'); }";
-        runOnUiThread(() -> webView.evaluateJavascript(script, null));
     }
 
     @Override
